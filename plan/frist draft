@@ -1,0 +1,422 @@
+📘 COMPLETE IMPLEMENTATION PLAN
+Metadata-Driven News Article Retrieval & Analytics System
+
+(IR + Analytics, Offline, Explainable, Standalone)
+
+1. PROJECT GOAL (LOCKED)
+
+Build a single standalone AI system that:
+
+Performs Information Retrieval (IR) on news articles
+
+Performs Analytics / Data Mining on the same data
+
+Uses metadata-aware ranking
+
+Uses RAG + small local LLM only for explanation/summarization
+
+Runs completely offline
+
+Uses static frontend (HTML/JS)
+
+Has two clearly different UI modes
+
+Shows why results appear
+
+Shows metrics and models
+
+Is fully explainable
+
+2. SYSTEM MODES (NON-NEGOTIABLE)
+Mode 1: Information Retrieval (IR Mode)
+
+Query-based
+
+Ranking-focused
+
+Shows recall, precision, scores
+
+Shows why documents ranked
+
+Mode 2: Analytics / Mining Mode
+
+Query-free
+
+Pattern-based
+
+Shows distributions, trends
+
+Shows why patterns exist
+
+UI must change between modes.
+
+3. DATA SOURCE — NEWS ARTICLES (CRITICAL)
+3.1 Recommended News Datasets (DOWNLOAD ONCE)
+
+Use ONE of the following (pick one):
+
+✅ OPTION A (BEST): Kaggle News Dataset (Offline Use)
+
+Search on Kaggle:
+
+"news articles dataset"
+
+
+Recommended datasets:
+
+All the News (Kaggle)
+~143k articles
+Fields: title, content, author, date, source
+
+AG News Dataset
+~120k articles
+Fields: title, description, category
+
+📌 Download as CSV
+📌 No API usage
+📌 Use locally
+
+✅ OPTION B: BBC News Dataset
+
+~2,200 articles
+
+Clean categories
+
+Lightweight (good for demo)
+
+❌ DO NOT USE
+
+Live news APIs
+
+Scraping live sites
+
+Google News
+
+Paid datasets
+
+4. DATA PREPARATION PIPELINE
+4.1 Convert Dataset → Unified Schema
+
+Create a preprocessing script:
+
+news_articles = {
+  doc_id,
+  title,
+  content,
+  category,
+  tags,
+  source,
+  published_at,
+  word_count
+}
+
+
+If tags not available:
+
+Extract keywords (top TF terms)
+
+Store as comma-separated text
+
+5. DATABASE DESIGN (LOCAL ONLY)
+5.1 Database Choice
+
+✅ DuckDB
+
+Why:
+
+Single file
+
+Analytical queries
+
+Offline
+
+Fast
+
+SQL-based
+
+No server
+
+5.2 Database Creation
+CREATE TABLE news_articles (
+  doc_id INTEGER,
+  title TEXT,
+  content TEXT,
+  category TEXT,
+  tags TEXT,
+  source TEXT,
+  published_at DATE,
+  word_count INTEGER
+);
+
+
+Database file:
+
+news_corpus.duckdb
+
+6. INFORMATION RETRIEVAL IMPLEMENTATION
+6.1 Text Processing
+
+For both documents and queries:
+
+Lowercase
+
+Tokenize
+
+Remove stopwords
+
+Optional stemming
+
+6.2 Vectorization (CHOOSE ONE)
+Option 1: TF-IDF (Recommended)
+
+Interpretable
+
+IR-standard
+
+Easy to explain
+
+Option 2: BM25
+
+Better ranking
+
+Slightly complex
+
+📌 Pick ONE and freeze.
+
+6.3 Ranking Logic
+
+For query q:
+
+Vectorize query
+
+Compute similarity with all docs
+
+Sort descending
+
+Assign rank
+
+6.4 Rank Stratification (CORE FEATURE)
+
+From sorted list:
+
+Top 20 → High relevance
+
+Bottom 20 → Low relevance
+
+Store:
+
+{
+  doc_id,
+  rank,
+  score,
+  rank_group
+}
+
+7. METADATA-AWARE BOOSTING
+
+Apply optional boosts:
+
+Category match
+
+Recency
+
+Tag overlap
+
+Explain boost mathematically in UI:
+
+final_score = tfidf_score + metadata_weight
+
+8. RAG + SMALL LLM (POST-RETRIEVAL ONLY)
+8.1 RAG Rule (STRICT)
+
+LLM never searches
+LLM never ranks
+LLM only organizes retrieved text
+
+8.2 LLM Input
+
+Titles + excerpts of Top 20 & Bottom 20
+
+Metadata summaries
+
+8.3 LLM Output
+
+Summary
+
+Key points
+
+Differences (top vs bottom)
+
+9. BACKEND (LOCAL ONLY)
+9.1 Responsibilities
+
+Handle search
+
+Compute metrics
+
+Generate explanations
+
+Serve JSON
+
+9.2 Required Endpoints
+/search        → IR results
+/metrics       → Precision, Recall
+/analytics     → Mining results
+/debug         → Pipeline explanation
+
+10. FRONTEND — STATIC HTML (GITHUB PAGES SAFE)
+10.1 Mode Switch (TOP BAR)
+[ IR MODE ]   [ ANALYTICS MODE ]
+
+
+Switching mode:
+
+Changes UI layout
+
+Changes controls
+
+Changes backend calls
+
+11. IR MODE UI (QUERY-BASED)
+Visible Components
+
+Query Input
+
+Metadata Filters
+
+Search Button
+
+Ranked Results Panel
+
+Explanation Panel
+
+Metrics Panel
+
+IR MODE OUTPUTS (MANDATORY)
+
+Top 20 documents
+
+Bottom 20 documents
+
+For each document:
+
+Rank
+
+Score
+
+Metadata used
+
+Explanation
+
+IR METRICS SHOWN
+
+Precision@20
+
+Recall@20
+
+F1 Score
+
+Coverage
+
+Explain formulas in UI:
+
+Recall = Retrieved Relevant / Total Relevant
+
+WHY THIS RESULT IS TOP (CLICKABLE)
+
+For each doc:
+
+• Matched query terms
+• Rare word bonus
+• Metadata boost
+• Final score composition
+
+12. ANALYTICS MODE UI (QUERY-FREE)
+UI MUST CHANGE
+
+Query box hidden or disabled
+
+Shows analysis controls instead
+
+Analytics Controls
+Analyze:
+( ) Entire Corpus
+( ) Last IR Results
+
+Analytics Outputs
+
+Category Distribution
+
+Term Frequency
+
+Source Bias
+
+Time Trends
+
+Top vs Bottom Comparison
+
+WHY THIS PATTERN EXISTS (MANDATORY)
+
+Each chart must include text:
+
+This pattern exists because:
+• High-ranked docs have domain-specific vocabulary
+• Low-ranked docs use generic terms
+• Metadata alignment influences ranking
+
+13. MODEL TRANSPARENCY PANEL (ALWAYS VISIBLE)
+MODELS USED
+• TF-IDF – relevance scoring
+• Cosine Similarity – ranking
+• Metadata Boosting – context
+• LLM – explanation only
+
+14. DEMO FLOW (CLASSROOM SAFE)
+
+Open static HTML
+
+Switch to IR Mode
+
+Enter query
+
+Show ranking + metrics
+
+Explain result reasons
+
+Switch to Analytics Mode
+
+Show patterns
+
+Explain patterns
+
+No internet.
+No cloud.
+No API failures.
+
+15. HOW THIS COVERS DATA MINING (WITHOUT SAYING IT)
+
+Internally:
+
+Frequency analysis
+
+Distribution analysis
+
+Comparative analysis
+
+Trend detection
+
+Externally:
+
+“Metadata-driven insights”
+
+16. WHAT NEVER CHANGES
+
+Dataset
+
+Backend
+
+UI structure
+
+Architecture
+
+Only mode interpretation changes.

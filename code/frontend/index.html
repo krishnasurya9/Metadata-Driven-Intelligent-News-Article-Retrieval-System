@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="News Article Search & Analytics">
+    <title>News Search</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <a href="#" class="logo" onclick="window.location.reload()">
+                <span class="logo-text">News</span><span class="logo-accent">Search</span>
+            </a>
+            <nav class="header-nav">
+                <button class="nav-btn active" data-mode="search">Search</button>
+                <button class="nav-btn" data-mode="analytics">Analytics</button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main View -->
+    <main class="search-view" id="main-view">
+
+        <!-- Search Hero -->
+        <div class="search-hero" id="search-hero">
+            <h1 class="hero-title">Discover the world.</h1>
+            <p class="hero-subtitle">Search through verified news sources and analytics.</p>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="search-container">
+            <div class="search-box">
+                <input type="text" id="query-input" placeholder="Search news, topics, or sources..."
+                    class="search-input" autofocus>
+                <button id="search-btn" class="search-btn">Search</button>
+            </div>
+        </div>
+
+        <!-- Live News Section -->
+        <section class="live-news-section" id="live-news-container">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="live-indicator"></span> Live Headlines
+                </h2>
+                <!-- Optional: Source filter dropdown could go here -->
+            </div>
+            <div id="live-news-grid" class="news-grid">
+                <!-- Live news cards will be injected here -->
+                <div class="loading-spinner"></div>
+            </div>
+        </section>
+
+        <!-- Search Results (Initially Hidden) -->
+        <div class="results-container hidden" id="results-container">
+            <div class="results-info">
+                <span id="results-count"></span>
+                <span id="results-time" style="color: #666; font-size: 0.9em; margin-left: 10px;"></span>
+            </div>
+
+            <!-- AI Summary Box -->
+            <div id="search-summary" class="search-summary hidden">
+                <div class="summary-header">
+                    <span class="summary-icon">✨</span> AI Summary
+                </div>
+                <p id="summary-text" class="summary-text">Generating summary...</p>
+            </div>
+
+            <div id="results-list"></div>
+            <div id="pagination" class="pagination"></div>
+        </div>
+
+    </main>
+
+    <!-- Analytics View (Hidden) -->
+    <main class="analytics-view hidden" id="analytics-view">
+        <!-- Re-use existing analytics structure or update later if needed -->
+        <!-- For now, we keep the structure compatible with existing analytics-mode.js but styled with new CSS -->
+        <div class="search-view">
+            <h2>Analytics Dashboard</h2>
+            <p class="hero-subtitle">Deep dive into corpus statistics.</p>
+            <div id="analytics-content">
+                <!-- Analytics content injection point -->
+                <canvas id="category-chart"></canvas>
+            </div>
+        </div>
+    </main>
+
+    <!-- Metrics Sidebar Toggle -->
+    <button id="metrics-toggle" class="status-toggle" style="bottom: 80px;" title="View Search Metrics">
+        <span class="status-icon">📊</span>
+    </button>
+
+    <aside id="metrics-sidebar" class="status-sidebar">
+        <div class="sidebar-header">
+            <h3>Search Metrics</h3>
+            <button id="close-metrics" class="close-btn">&times;</button>
+        </div>
+        <div class="sidebar-content">
+            <div class="status-item">
+                <span class="status-label">Precision @ 20</span>
+                <span id="metric-precision" class="status-value">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Recall</span>
+                <span id="metric-recall" class="status-value">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">F1 Score</span>
+                <span id="metric-f1" class="status-value">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Avg Relevance</span>
+                <span id="metric-score" class="status-value">-</span>
+            </div>
+
+            <div style="margin-top: 20px; padding: 12px; background: #f8f9fa; border-radius: 8px; font-size: 13px;">
+                <h4 style="font-size: 12px; margin-bottom: 8px; color: #555;">METRIC DEFINITIONS</h4>
+                <p style="margin-bottom: 6px; color: #666;"><strong>Precision:</strong> How accurate the results are.
+                </p>
+                <p style="margin-bottom: 6px; color: #666;"><strong>Recall:</strong> How comprehensive the search is.
+                </p>
+                <p style="color: #666;"><strong>F1:</strong> Balance between precision and recall.</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- System Status Sidebar -->
+    <button id="status-toggle" class="status-toggle" title="Check System Status">
+        <span class="status-icon">⚡</span>
+    </button>
+
+    <aside id="status-sidebar" class="status-sidebar">
+        <div class="sidebar-header">
+            <h3>System Status</h3>
+            <button id="close-sidebar" class="close-btn">&times;</button>
+        </div>
+        <div class="sidebar-content">
+            <div class="status-item">
+                <span class="status-label">Backend</span>
+                <span id="status-backend" class="status-value pending">Checking...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Database</span>
+                <span id="status-db" class="status-value pending">Checking...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Index</span>
+                <span id="status-index" class="status-value">...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">LLM Service</span>
+                <span id="status-llm" class="status-value pending">Checking...</span>
+            </div>
+
+            <div class="sidebar-actions">
+                <button id="refresh-status" class="action-btn">Refresh Status</button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="loader"></div>
+        <p>Searching...</p>
+    </div>
+
+    <!-- Scripts -->
+    <script src="app.js"></script> <!-- Main controller -->
+    <script src="live-news.js"></script> <!-- New Live News -->
+    <script src="analytics-mode.js"></script>
+</body>
+
+</html>
