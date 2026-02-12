@@ -19,6 +19,7 @@ graph TB
         API[REST API Endpoints]
         IRE[IR Engine - TF-IDF]
         ANA[Analytics Engine]
+        MIN[Mining Engine (New)]
         LLM[Local LLM - LM Studio/Ollama]
     end
     
@@ -33,10 +34,13 @@ graph TB
     AN_UI --> API
     API --> IRE
     API --> ANA
+    API --> MIN
     IRE --> DB
     ANA --> DB
+    MIN --> DB
     IRE --> IDX
     API --> LLM
+
 ```
 
 ---
@@ -69,10 +73,14 @@ DuckDB is an embedded database (like SQLite) - installed via `pip install duckdb
 | `/api/search` | POST | IR search with TF-IDF ranking |
 | `/api/metrics` | GET | Precision, Recall, F1 scores |
 | `/api/analytics` | POST | Category, term, source, time analysis |
+| `/api/mining/association` | GET | Generate keyword association rules |
+| `/api/mining/clustering` | GET | Perform K-Means clustering on articles |
+| `/api/mining/classification` | POST | Train/Evaluate category classifier |
 | `/api/debug` | GET | Full pipeline explanation |
 | `/api/categories` | GET | List all categories |
 | `/api/sources` | GET | List all sources |
 | `/api/stats` | GET | Corpus statistics |
+
 | `/api/llm/configure` | POST | Configure LM Studio endpoint |
 
 ---
@@ -84,8 +92,10 @@ a:\MSC\sem 2\project\code\
 ├── backend/
 │   ├── app.py                 # Flask app & routes
 │   ├── ir_engine.py           # TF-IDF & ranking
-│   ├── analytics_engine.py    # Data mining
+│   ├── analytics_engine.py    # Basic analytics
+│   ├── mining_engine.py       # [NEW] Advanced mining (Clustering, Association)
 │   ├── database.py            # DuckDB operations
+
 │   ├── preprocessor.py        # Text preprocessing
 │   ├── llm_service.py         # LM Studio/Ollama integration
 │   └── requirements.txt

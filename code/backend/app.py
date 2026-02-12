@@ -10,7 +10,9 @@ import os
 import database
 import ir_engine
 import analytics_engine
+import mining_engine
 import llm_service
+
 import news_fetcher
 from dotenv import load_dotenv
 
@@ -245,7 +247,54 @@ def analytics():
         return jsonify({"status": "error", "message": f"Unknown analysis type: {analysis_type}"}), 400
     
     result['mode'] = mode
+    result['mode'] = mode
     return jsonify(result)
+
+
+@app.route('/api/mining/association', methods=['GET'])
+def mining_association():
+    """Generate association rules for tags"""
+    try:
+        min_support = float(request.args.get('min_support', 0.05))
+        min_confidence = float(request.args.get('min_confidence', 0.2))
+        
+        result = mining_engine.generate_association_rules(min_support, min_confidence)
+        if "error" in result:
+             return jsonify({"status": "error", "message": result["error"]}), 400
+             
+        return jsonify({"status": "success", "data": result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/mining/clustering', methods=['POST'])
+def mining_clustering():
+    """Perform K-Means clustering"""
+    data = request.get_json() or {}
+    n_clusters = int(data.get('n_clusters', 5))
+    
+    try:
+        result = mining_engine.perform_clustering(n_clusters)
+        if "error" in result:
+             return jsonify({"status": "error", "message": result["error"]}), 400
+             
+        return jsonify({"status": "success", "data": result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/mining/classification', methods=['POST'])
+def mining_classification():
+    """Train and evaluate category classifier"""
+    try:
+        result = mining_engine.train_classifier()
+        if "error" in result:
+             return jsonify({"status": "error", "message": result["error"]}), 400
+             
+        return jsonify({"status": "success", "data": result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 
 
 @app.route('/api/debug', methods=['GET'])

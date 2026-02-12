@@ -373,6 +373,170 @@ a {
     }
 }
 
+.loading-overlay p {
+    margin-top: 15px;
+    font-size: 1.1em;
+    color: #555;
+    font-weight: 500;
+}
+
+/* =========================================
+   Mining Lab Styles
+   ========================================= */
+.mining-nav {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 30px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+}
+
+.mining-tab-btn {
+    background: none;
+    border: none;
+    padding: 10px 20px;
+    font-size: 1rem;
+    color: #666;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.mining-tab-btn:hover {
+    color: var(--primary-color);
+}
+
+.mining-tab-btn.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    font-weight: 600;
+}
+
+.mining-controls {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.run-btn {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.run-btn:hover {
+    background-color: #357abd;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-size: 0.95rem;
+}
+
+.data-table th,
+.data-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.data-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #444;
+}
+
+.clusters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.cluster-card {
+    background: white;
+    border: 1px solid #eee;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.cluster-card h3 {
+    margin: 0 0 10px 0;
+    color: var(--primary-color);
+}
+
+.cluster-size {
+    font-size: 0.9em;
+    color: #666;
+    margin-bottom: 15px;
+}
+
+.cluster-terms {
+    background: #f0f7ff;
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    font-size: 0.9em;
+}
+
+.cluster-samples ul {
+    list-style: none;
+    padding: 0;
+    margin: 5px 0 0 0;
+}
+
+.cluster-samples li {
+    font-size: 0.85em;
+    color: #555;
+    margin-bottom: 4px;
+    padding-left: 10px;
+    border-left: 2px solid #ddd;
+}
+
+.model-score {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%);
+    border-radius: 12px;
+    border: 1px solid #e1e8ed;
+}
+
+.score-circle {
+    width: 80px;
+    height: 80px;
+    background: var(--primary-color);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.2rem;
+}
+
+.score-circle small {
+    font-size: 0.7rem;
+    font-weight: 400;
+    opacity: 0.9;
+}
+
 .news-time {
     margin-top: auto;
     font-size: 12px;

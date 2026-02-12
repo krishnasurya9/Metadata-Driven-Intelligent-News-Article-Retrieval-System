@@ -7,9 +7,16 @@ A comprehensive news retrieval and analytics system that fetches live news from 
 *   **Multi-Source News Fetching**: Integrates with Guardian API, Mediastack, and NewsAPI to fetch live news.
 *   **Intelligent Search**: Uses TF-IDF and BM25 algorithms for relevant article retrieval.
 *   **Metadata-Driven**: Filters and ranks based on metadata like date, category, and source.
-*   **Analytics Dashboard**: Visualizes new category distributions, source trends, and publication timelines.
 *   **Local Storage**: Uses DuckDB for efficient, local, serverless data storage.
 *   **Background Processing**: Automatic background fetching and indexing without blocking the UI.
+
+### 🧪 Advanced Features (In Development)
+*   **Analytics Dashboard**: Visualizes new category distributions, source trends, and publication timelines.
+*   **Data Mining Lab**:
+    *   **Association Rule Mining**: Discovering relationships between keywords.
+    *   **Clustering**: Unsupervised topic discovery.
+    *   **Classification**: Automated category prediction.
+
 
 ## 🛠️ Setup & Installation
 

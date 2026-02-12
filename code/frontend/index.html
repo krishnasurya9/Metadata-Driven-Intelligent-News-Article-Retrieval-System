@@ -21,6 +21,7 @@
             <nav class="header-nav">
                 <button class="nav-btn active" data-mode="search">Search</button>
                 <button class="nav-btn" data-mode="analytics">Analytics</button>
+                <button class="nav-btn" data-mode="mining">Mining Lab</button>
             </nav>
         </div>
     </header>
@@ -91,6 +92,51 @@
             </div>
         </div>
     </main>
+
+    <!-- Mining Lab View (Hidden) -->
+    <main class="mining-view hidden" id="mining-view">
+        <div class="search-view">
+            <h2>Data Mining Lab</h2>
+            <p class="hero-subtitle">Advanced algorithms for pattern discovery.</p>
+
+            <div class="mining-nav">
+                <button class="mining-tab-btn active" data-target="mining-association">Association Rules</button>
+                <button class="mining-tab-btn" data-target="mining-clustering">Clustering</button>
+                <button class="mining-tab-btn" data-target="mining-classification">Classification</button>
+            </div>
+
+            <!-- Tab 1: Association Rules -->
+            <div id="mining-association" class="mining-tab-content">
+                <div class="mining-controls">
+                    <p>Discover relationships between tags/keywords in the news corpus.</p>
+                    <button id="run-association" class="run-btn">Generate Rules</button>
+                </div>
+                <div id="association-results"></div>
+            </div>
+
+            <!-- Tab 2: Clustering -->
+            <div id="mining-clustering" class="mining-tab-content hidden">
+                <div class="mining-controls">
+                    <label>Number of Clusters (K):
+                        <input type="number" id="num-clusters" value="5" min="2" max="10"
+                            style="padding: 5px; width: 60px;">
+                    </label>
+                    <button id="run-clustering" class="run-btn">Run K-Means</button>
+                </div>
+                <div id="clustering-results"></div>
+            </div>
+
+            <!-- Tab 3: Classification -->
+            <div id="mining-classification" class="mining-tab-content hidden">
+                <div class="mining-controls">
+                    <p>Train a Random Forest classifier to predict article categories.</p>
+                    <button id="run-classification" class="run-btn">Train Model</button>
+                </div>
+                <div id="classification-results"></div>
+            </div>
+        </div>
+    </main>
+
 
     <!-- Metrics Sidebar Toggle -->
     <button id="metrics-toggle" class="status-toggle" style="bottom: 80px;" title="View Search Metrics">
@@ -175,6 +221,8 @@
     <script src="app.js"></script> <!-- Main controller -->
     <script src="live-news.js"></script> <!-- New Live News -->
     <script src="analytics-mode.js"></script>
+    <script src="mining-lab.js"></script>
+
 </body>
 
 </html>

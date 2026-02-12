@@ -48,6 +48,10 @@ const elements = {
     // Analytics
     mainAnalytics: document.getElementById('analytics-view'),
 
+    // Mining
+    mainMining: document.getElementById('mining-view'),
+
+
     // Navigation
     navBtns: document.querySelectorAll('.nav-btn'),
 
@@ -227,6 +231,8 @@ function updateMetrics(metrics) {
 function showHomePage() {
     elements.mainView.classList.remove('hidden');
     elements.mainAnalytics.classList.add('hidden');
+    elements.mainMining?.classList.add('hidden');
+
 
     // Reset view
     elements.searchHero.style.display = 'block';
@@ -242,6 +248,8 @@ function showHomePage() {
 function showResultsPage() {
     elements.mainView.classList.remove('hidden');
     elements.mainAnalytics.classList.add('hidden');
+    elements.mainMining?.classList.add('hidden');
+
 
     // Transition to results view
     elements.searchHero.style.display = 'none';
@@ -256,16 +264,35 @@ function showResultsPage() {
 function showAnalyticsPage() {
     elements.mainView.classList.add('hidden');
     elements.mainAnalytics.classList.remove('hidden');
+    elements.mainMining?.classList.add('hidden');
+
 
     updateNavButtons('analytics');
     loadAnalytics();
 }
 
+function showMiningPage() {
+    elements.mainView.classList.add('hidden');
+    elements.mainAnalytics.classList.add('hidden');
+    elements.mainMining?.classList.remove('hidden');
+
+    updateNavButtons('mining');
+
+    // Initialize Mining Lab
+    if (window.MiningLab) {
+        window.MiningLab.init();
+    }
+}
+
+
 function switchMode(mode) {
     state.currentMode = mode;
     if (mode === 'analytics') {
         showAnalyticsPage();
+    } else if (mode === 'mining') {
+        showMiningPage();
     } else {
+
         if (state.allResults.length > 0) {
             showResultsPage();
         } else {
