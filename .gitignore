@@ -35,6 +35,9 @@ ENV/
 
 # Project specific
 *.db
+*.duckdb
 *.sqlite3
-/data/
-/logs/
+*.pkl
+code/data/news_corpus.duckdb
+code/data/*.pkl
+
