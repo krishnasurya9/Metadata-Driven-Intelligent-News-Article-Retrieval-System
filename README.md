@@ -1,22 +1,19 @@
-# Metadata-Driven Intelligent News Article Retrieval System
+# Multi-Objective News Intelligence System
+> **A unified architecture serving two distinct academic domains: Information Retrieval Techniques (IRT) and Concepts of Data Mining (CDM).**
 
-A comprehensive news retrieval and analytics system that fetches live news from multiple sources, indexes them for search, and provides analytical insights.
+This repository houses a comprehensive, offline-first AI pipeline that ingests digital news from multiple sources, indexes them for semantic search, and autonomously discovers underlying correlations and patterns.
 
-## 🚀 Features
+## 🚀 Core Methodologies
 
-*   **Multi-Source News Fetching**: Integrates with Guardian API, Mediastack, and NewsAPI to fetch live news.
-*   **Intelligent Search**: Uses TF-IDF and BM25 algorithms for relevant article retrieval.
-*   **Metadata-Driven**: Filters and ranks based on metadata like date, category, and source.
-*   **Local Storage**: Uses DuckDB for efficient, local, serverless data storage.
-*   **Background Processing**: Automatic background fetching and indexing without blocking the UI.
+### 🔍 Information Retrieval (IRT) Objective: *Metadata-Driven Intelligent News Retrieval System*
+*   **Contextual Search:** Overcomes standard keyword failure utilizing TF-IDF and BM25 algorithms for deep semantic retrieval.
+*   **Metadata Weighting:** Ranks documents not just on text similarity, but by assigning authoritative multipliers to publication dates, sources, and tags.
+*   **Explainable RAG:** Uses local small Language Models (LM Studio/Ollama) strictly as post-retrieval synthesizers to explain *why* specific documents ranked highly.
 
-### 🧪 Advanced Features (In Development)
-*   **Analytics Dashboard**: Visualizes new category distributions, source trends, and publication timelines.
-*   **Data Mining Lab**:
-    *   **Association Rule Mining**: Discovering relationships between keywords.
-    *   **Clustering**: Unsupervised topic discovery.
-    *   **Classification**: Automated category prediction.
-
+### ⛏️ Data Mining (CDM) Objective: *Automated Data Mining & Pattern Discovery System*
+*   **Embedded Warehousing:** Operates a local DuckDB data warehouse to ingest massive, heterogeneous CSVs (like AG News) and live API streams seamlessly.
+*   **Pattern Discovery:** Transitions raw text into tokenized mathematical matrices to enable Unsupervised Topic Discovery (K-Means/DBSCAN) and Classification (SVM).
+*   **Dashboard Visualization:** Replaces query-based search with an "Analytics Mode" to visually plot Feature Correlation, Source Biases, and Category Distributions across time.
 
 ## 🛠️ Setup & Installation
 
