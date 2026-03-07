@@ -26,13 +26,13 @@
 ## 3. Literature Review (Background & Concepts)
 > **Rubric Requirement:** Minimum 5-8 papers demonstrating relevance and understanding.
 
-The system's architecture is built upon the foundational concepts established in the following key academic papers and domains:
-1.  **TF-IDF Optimization:** Salton, G., & Buckley, C. (1988). *Term-weighting approaches in automatic text retrieval.* Validation of the core 'Base Scoring' mechanism used in our pipeline.
-2.  **Probabilistic IR (BM25):** Robertson, S. E., & Sparck Jones, K. (1976). *Relevance weighting of search terms.* Justification for evaluating document relevancy dynamically based on term saturation.
-3.  **Dense Neural Embeddings:** Reimers, N., & Gurevych, I. (2019). *Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks.* Required for understanding the limitations of sparse retrieval vs. our planned hybrid semantic approach.
-4.  **Retrieval-Augmented Generation (RAG):** Lewis, P., et al. (2020). *Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks.* Serves as the blueprint for why our local LLMs (Ollama) act *exclusively* as post-retrieval synthesizers rather than search engines.
-5.  **Offline Database Architecture:** Raasveldt, M., & Mühleisen, H. (2019). *DuckDB: an Embeddable Analytical Database.* Provides the academic baseline for transitioning away from heavy cloud databases to localized analytical querying for rapid IR processing.
-6.  **Metadata Contextualization:** (Add user-selected paper on Recency/Source Authority weighting in news domains here).
+The system's architecture is built upon the foundational concepts established in the following key academic domains (papers to be added):
+1.  **[Placeholder: Paper 1 on TF-IDF Optimization]** - Validation of the core 'Base Scoring' mechanism used in our pipeline.
+2.  **[Placeholder: Paper 2 on Probabilistic IR (BM25)]** - Justification for evaluating document relevancy dynamically based on term saturation.
+3.  **[Placeholder: Paper 3 on Dense Neural Embeddings]** - Required for understanding the limitations of sparse retrieval vs. our planned hybrid semantic approach.
+4.  **[Placeholder: Paper 4 on Retrieval-Augmented Generation (RAG)]** - Serves as the blueprint for why our local LLMs act *exclusively* as post-retrieval synthesizers rather than search engines.
+5.  **[Placeholder: Paper 5 on Offline Database Architecture]** - Provides the academic baseline for transitioning away from heavy cloud databases to localized analytical querying for rapid IR processing.
+6.  **[Placeholder: Paper 6 on Metadata Contextualization]** - Validating Recency/Source Authority weighting in news domains.
 
 **Key Concepts Explored From Literature:**
 *   **Sparse vs. Dense Retrieval:** Analysis of traditional term-frequency algorithms versus dense neural embeddings (`sentence-transformers`), noting that hybrid approaches yield the best context preservation.
