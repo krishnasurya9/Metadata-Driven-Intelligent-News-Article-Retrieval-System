@@ -96,69 +96,181 @@ def save_articles(articles: List[Dict]) -> int:
     return new_count
 
 
-def load_articles_from_csv(file_path: str) -> Dict[str, Any]:
-    """Load articles from a CSV file into the database"""
+def load_articles_from_csv(file_path: str, mode: str = 'replace') -> Dict[str, Any]:
+    """
+    Smart Auto-Ingest: Load any CSV into the warehouse.
+    Automatically detects and maps columns to the warehouse schema.
+    
+    mode: 'replace' = clear existing data first, 'append' = add to existing data
+    """
     import pandas as pd
     
     if not os.path.exists(file_path):
         return {"status": "error", "message": f"File not found: {file_path}"}
     
     try:
-        df = pd.read_csv(file_path)
+        # Read CSV with automatic encoding detection
+        try:
+            df = pd.read_csv(file_path, low_memory=False)
+        except UnicodeDecodeError:
+            df = pd.read_csv(file_path, encoding='latin-1', low_memory=False)
         
-        # Map common column names to our schema
-        column_mapping = {
-            'id': 'doc_id',
-            'headline': 'title',
-            'Summary': 'title',  # Kaggle news-dataset
-            'text': 'content',
-            'Text': 'content',   # Kaggle news-dataset
-            'body': 'content',
-            'description': 'content',
-            'date': 'published_at',
-            'publication': 'source',
-            'author': 'source',
-            'label': 'category',
-            'topic': 'category'
+        original_cols = list(df.columns)
+        original_rows = len(df)
+        
+        # ── Smart Schema Mapping ──────────────────────────────────────
+        # Define known aliases for each warehouse field (case-insensitive)
+        SCHEMA_ALIASES = {
+            'title': [
+                'title', 'headline', 'headline_text', 'heading', 'name',
+                'summary', 'subject', 'article_title', 'news_title', 'head'
+            ],
+            'content': [
+                'content', 'text', 'body', 'description', 'article_text',
+                'article', 'full_text', 'news_text', 'story', 'abstract',
+                'article_content', 'news_body', 'detail', 'details'
+            ],
+            'category': [
+                'category', 'label', 'topic', 'headline_category', 'section',
+                'class', 'type', 'genre', 'news_category', 'classification',
+                'tag', 'department'
+            ],
+            'source': [
+                'source', 'publication', 'publisher', 'author', 'outlet',
+                'newspaper', 'provider', 'media', 'news_source', 'origin',
+                'channel', 'website'
+            ],
+            'published_at': [
+                'published_at', 'date', 'pubdate', 'publish_date',
+                'published_date', 'publication_date', 'datetime', 'timestamp',
+                'created_at', 'pub_date', 'news_date', 'article_date', 'time'
+            ],
+            'url': [
+                'url', 'link', 'guid', 'href', 'web_url', 'article_url',
+                'news_url', 'source_url', 'permalink'
+            ],
+            'doc_id': [
+                'doc_id', 'id', 'article_id', 'news_id', 'index', 'sr_no'
+            ]
         }
         
-        df = df.rename(columns={k: v for k, v in column_mapping.items() if k in df.columns})
+        # Build mapping: check each CSV column against aliases
+        col_lower_map = {col.lower().strip(): col for col in df.columns}
+        mapped = {}
+        mapping_log = {}
         
-        # Ensure required columns exist
-        if 'doc_id' not in df.columns:
-            df['doc_id'] = range(1, len(df) + 1)
-        if 'title' not in df.columns and 'content' in df.columns:
-            df['title'] = df['content'].str[:100] + '...'
-        if 'tags' not in df.columns:
-            df['tags'] = ''
-        if 'word_count' not in df.columns and 'content' in df.columns:
-            df['word_count'] = df['content'].fillna('').str.split().str.len()
+        for target_field, aliases in SCHEMA_ALIASES.items():
+            for alias in aliases:
+                if alias.lower() in col_lower_map:
+                    original_name = col_lower_map[alias.lower()]
+                    mapped[target_field] = original_name
+                    mapping_log[original_name] = target_field
+                    break
+        
+        # Apply the mapping
+        rename_map = {v: k for k, v in mapped.items()}
+        df = df.rename(columns=rename_map)
+        
+        # ── Auto-derive missing fields ────────────────────────────────
+        file_basename = os.path.splitext(os.path.basename(file_path))[0]
+        
+        # If no title but content exists, truncate content
+        if 'title' not in df.columns:
+            if 'content' in df.columns:
+                df['title'] = df['content'].fillna('').str[:120] + '...'
+            else:
+                df['title'] = f'Article from {file_basename}'
+        
+        # If no content but title exists, use title as content
+        if 'content' not in df.columns:
+            if 'title' in df.columns:
+                df['content'] = df['title']
+            else:
+                df['content'] = ''
+        
+        # Fill missing fields with sensible defaults
         if 'category' not in df.columns:
             df['category'] = 'general'
         if 'source' not in df.columns:
-            df['source'] = 'unknown'
+            # Derive source from filename (e.g., bbc_news.csv → BBC News)
+            df['source'] = file_basename.replace('_', ' ').replace('-', ' ').title()
+        if 'tags' not in df.columns:
+            df['tags'] = ''
+        if 'url' not in df.columns:
+            df['url'] = ''
+        
+        # Parse dates intelligently
         if 'published_at' not in df.columns:
             df['published_at'] = None
-            
-        # Select only our schema columns
-        schema_cols = ['doc_id', 'title', 'content', 'category', 'tags', 'source', 'published_at', 'word_count']
-        df = df[[c for c in schema_cols if c in df.columns]]
+        else:
+            df['published_at'] = pd.to_datetime(df['published_at'], 
+                                                  format='mixed', 
+                                                  dayfirst=False, 
+                                                  errors='coerce')
         
-        # Insert into database
+        # Compute word count
+        if 'word_count' not in df.columns:
+            df['word_count'] = df['content'].fillna('').str.split().str.len()
+        
+        # Auto-assign doc_ids (will be renumbered below)
+        if 'doc_id' not in df.columns:
+            df['doc_id'] = 0  # placeholder, assigned below
+        
+        # ── Clean the data ────────────────────────────────────────────
+        # Drop rows with no title AND no content
+        df = df.dropna(subset=['title', 'content'], how='all')
+        
+        # Fill NaN in text columns
+        df['title'] = df['title'].fillna('')
+        df['content'] = df['content'].fillna('')
+        df['category'] = df['category'].fillna('general')
+        df['source'] = df['source'].fillna(file_basename)
+        df['tags'] = df['tags'].fillna('')
+        df['url'] = df['url'].fillna('')
+        df['word_count'] = df['word_count'].fillna(0).astype(int)
+        
+        # Select only schema columns
+        schema_cols = ['doc_id', 'title', 'content', 'category', 'tags', 
+                       'source', 'published_at', 'word_count', 'url']
+        for col in schema_cols:
+            if col not in df.columns:
+                df[col] = None
+        df = df[schema_cols]
+        
+        # ── Insert into warehouse ─────────────────────────────────────
         conn = get_connection()
-        conn.execute("DELETE FROM news_articles")  # Clear existing data
+        
+        if mode == 'replace':
+            conn.execute("DELETE FROM news_articles")
+            start_id = 1
+        else:
+            # Append: get next available doc_id
+            max_id = conn.execute("SELECT COALESCE(MAX(doc_id), 0) FROM news_articles").fetchone()[0]
+            start_id = max_id + 1
+        
+        # Assign sequential doc_ids
+        df['doc_id'] = range(start_id, start_id + len(df))
+        
+        # Insert
         conn.execute("INSERT INTO news_articles SELECT * FROM df")
         
-        count = conn.execute("SELECT COUNT(*) FROM news_articles").fetchone()[0]
+        total_count = conn.execute("SELECT COUNT(*) FROM news_articles").fetchone()[0]
         categories = conn.execute("SELECT DISTINCT category FROM news_articles").fetchall()
+        sources_count = conn.execute("SELECT COUNT(DISTINCT source) FROM news_articles").fetchone()[0]
         
         conn.close()
         
         return {
             "status": "success",
-            "documents_loaded": count,
+            "documents_loaded": len(df),
+            "total_in_warehouse": total_count,
             "categories_found": [c[0] for c in categories],
-            "columns_mapped": list(df.columns)
+            "sources_found": sources_count,
+            "schema_mapping": mapping_log,
+            "original_columns": original_cols,
+            "original_rows": original_rows,
+            "mode": mode,
+            "file": os.path.basename(file_path)
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}

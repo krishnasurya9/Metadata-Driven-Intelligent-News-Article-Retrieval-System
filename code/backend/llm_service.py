@@ -134,19 +134,22 @@ def generate_search_summary(query: str, top_results: List[Dict],
         for r in bottom_results[:3]
     ])
     
-    system_prompt = "You are a helpful news assistant. summarizing the content of news articles. Focus on the facts and events described."
+    system_prompt = "You are a professional news analyst. Summarize the provided articles concisely. Focus on the main events, key figures, and outcomes. Do not introduce outside information."
     
-    prompt = f"""Based on the following search results for the query "{query}", provide a clear and concise summary of the news.
-    
-    What is the main matter or topic discussed in these articles?
-    
-    Articles:
+    prompt = f"""Analyze the following search results for the query "{query}":
+
     {top_context}
     
-    Summary of content:"""
+    Provide a structured summary:
+    1. **Key Event/Topic**: What is the main subject?
+    2. **Details**: 2-3 bullet points covering the most important facts.
+    3. **Conclusion**: A one-sentence wrap-up.
+    
+    If the articles are unrelated, state that the search returned diverse topics."""
     
     result = generate_text(prompt, system_prompt)
     return result if result else _fallback_search_summary(query, top_results, bottom_results)
+
 
 
 def generate_general_answer(query: str) -> str:

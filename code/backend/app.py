@@ -16,6 +16,8 @@ import llm_service
 import news_fetcher
 from dotenv import load_dotenv
 
+import guardian_service
+
 # Load environment variables
 load_dotenv()
 
@@ -55,8 +57,10 @@ def load_data():
     if not os.path.isabs(file_path):
         file_path = os.path.join(os.path.dirname(__file__), '..', file_path)
     
-    # Load into database
-    result = database.load_articles_from_csv(file_path)
+    mode = data.get('mode', 'replace')  # 'replace' or 'append'
+    
+    # Load into database with smart schema mapping
+    result = database.load_articles_from_csv(file_path, mode=mode)
     
     if result.get('status') == 'success':
         # Build search index
@@ -65,6 +69,57 @@ def load_data():
         result['index'] = index_result
     
     return jsonify(result)
+
+
+@app.route('/api/data/upload', methods=['POST'])
+def upload_csv():
+    """Upload a CSV file and ingest into the warehouse"""
+    if 'file' not in request.files:
+        return jsonify({"status": "error", "message": "No file provided"}), 400
+    
+    file = request.files['file']
+    if file.filename == '' or not file.filename.endswith('.csv'):
+        return jsonify({"status": "error", "message": "Please upload a valid CSV file"}), 400
+    
+    # Save to data directory
+    data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+    os.makedirs(data_dir, exist_ok=True)
+    save_path = os.path.join(data_dir, file.filename)
+    file.save(save_path)
+    
+    # Ingest into warehouse (uploads always append by default)
+    mode = request.form.get('mode', 'append')
+    result = database.load_articles_from_csv(save_path, mode=mode)
+    
+    if result.get('status') == 'success':
+        documents = database.get_all_articles()
+        index_result = ir_engine.build_index(documents)
+        result['index'] = index_result
+        result['file_saved'] = file.filename
+    
+    return jsonify(result)
+
+
+@app.route('/api/data/info', methods=['GET'])
+def data_info():
+    """Return info about locally available data files"""
+    data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+    files = []
+    if os.path.exists(data_dir):
+        for f in os.listdir(data_dir):
+            fp = os.path.join(data_dir, f)
+            if os.path.isfile(fp):
+                size_mb = round(os.path.getsize(fp) / (1024 * 1024), 2)
+                files.append({"name": f, "size_mb": size_mb, "path": fp})
+    
+    # Current warehouse stats
+    stats = database.get_corpus_stats()
+    
+    return jsonify({
+        "local_files": files,
+        "warehouse": stats,
+        "default_csv": "news_articles.csv"
+    })
 
 
 @app.route('/api/search', methods=['POST'])
@@ -529,12 +584,19 @@ def initialize_system():
             print("No default dataset found. System will start empty.")
     else:
         print(f"System ready with {stats.get('total_documents')} documents.")
-        # Ensure index is built even if DB has data (in case server restarted)
-        index_info = ir_engine.get_index_info()
-        if index_info.get('status') != 'ready':
-            print("Rebuilding search index...")
-            documents = database.get_all_articles()
+        print(f"System ready with {stats.get('total_documents')} documents.")
+        
+        # Check if index exists on disk
+        # Smart Indexing Check
+        print("Checking index status...")
+        documents = database.get_all_articles()
+        
+        if ir_engine.check_index_needs_update(documents):
+            print("Index missing or outdated. Rebuilding...")
             ir_engine.build_index(documents)
+        else:
+            print("Index is up to date. Skipping build.")
+
 
 
 if __name__ == '__main__':

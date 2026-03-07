@@ -41,3 +41,5 @@ ENV/
 code/data/news_corpus.duckdb
 code/data/*.pkl
 
+*.csv
+code/data/*.csv

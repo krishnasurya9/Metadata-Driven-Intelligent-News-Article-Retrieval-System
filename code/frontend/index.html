@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="News Article Search & Analytics">
-    <title>News Search</title>
+    <meta name="description" content="Metadata-Driven Intelligent News Article Retrieval & Pattern Discovery System">
+    <title>NewsRetrieval System</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -16,7 +16,7 @@
     <header class="header">
         <div class="header-content">
             <a href="#" class="logo" onclick="window.location.reload()">
-                <span class="logo-text">News</span><span class="logo-accent">Search</span>
+                <span class="logo-text">News</span><span class="logo-accent">Retrieval</span>
             </a>
             <nav class="header-nav">
                 <button class="nav-btn active" data-mode="search">Search</button>
@@ -26,7 +26,9 @@
         </div>
     </header>
 
-    <!-- Main View -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- IR MODE: Search View                                    -->
+    <!-- ═══════════════════════════════════════════════════════ -->
     <main class="search-view" id="main-view">
 
         <!-- Search Hero -->
@@ -50,10 +52,8 @@
                 <h2 class="section-title">
                     <span class="live-indicator"></span> Live Headlines
                 </h2>
-                <!-- Optional: Source filter dropdown could go here -->
             </div>
             <div id="live-news-grid" class="news-grid">
-                <!-- Live news cards will be injected here -->
                 <div class="loading-spinner"></div>
             </div>
         </section>
@@ -81,61 +81,271 @@
 
     <!-- Analytics View (Hidden) -->
     <main class="analytics-view hidden" id="analytics-view">
-        <!-- Re-use existing analytics structure or update later if needed -->
-        <!-- For now, we keep the structure compatible with existing analytics-mode.js but styled with new CSS -->
         <div class="search-view">
             <h2>Analytics Dashboard</h2>
             <p class="hero-subtitle">Deep dive into corpus statistics.</p>
             <div id="analytics-content">
-                <!-- Analytics content injection point -->
                 <canvas id="category-chart"></canvas>
             </div>
         </div>
     </main>
 
-    <!-- Mining Lab View (Hidden) -->
-    <main class="mining-view hidden" id="mining-view">
-        <div class="search-view">
-            <h2>Data Mining Lab</h2>
-            <p class="hero-subtitle">Advanced algorithms for pattern discovery.</p>
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- MINING MODE: OLAP-Style Dashboard (Sidebar + Main Panel)      -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="mining-view hidden" id="mining-view">
 
-            <div class="mining-nav">
-                <button class="mining-tab-btn active" data-target="mining-association">Association Rules</button>
-                <button class="mining-tab-btn" data-target="mining-clustering">Clustering</button>
-                <button class="mining-tab-btn" data-target="mining-classification">Classification</button>
-            </div>
-
-            <!-- Tab 1: Association Rules -->
-            <div id="mining-association" class="mining-tab-content">
-                <div class="mining-controls">
-                    <p>Discover relationships between tags/keywords in the news corpus.</p>
-                    <button id="run-association" class="run-btn">Generate Rules</button>
+        <!-- Left Sidebar Navigation -->
+        <aside class="mining-sidebar">
+            <div class="mining-brand">
+                <div class="mining-brand-icon">⛏️</div>
+                <div>
+                    <div class="mining-brand-title">Pattern Discovery</div>
+                    <div class="mining-brand-sub">News Corpora Analysis</div>
                 </div>
-                <div id="association-results"></div>
             </div>
 
-            <!-- Tab 2: Clustering -->
-            <div id="mining-clustering" class="mining-tab-content hidden">
-                <div class="mining-controls">
-                    <label>Number of Clusters (K):
-                        <input type="number" id="num-clusters" value="5" min="2" max="10"
-                            style="padding: 5px; width: 60px;">
-                    </label>
-                    <button id="run-clustering" class="run-btn">Run K-Means</button>
+            <nav class="mining-sidebar-nav">
+                <div class="mining-nav-section-label">PIPELINE</div>
+                <button class="mining-nav-item active" data-target="mining-warehouse">
+                    <span class="mining-nav-icon">📦</span>
+                    <div class="mining-nav-text">
+                        <span class="mining-nav-label">Data Warehouse</span>
+                        <span class="mining-nav-sub">ETL & Integration</span>
+                    </div>
+                </button>
+                <button class="mining-nav-item" data-target="mining-preprocessing">
+                    <span class="mining-nav-icon">⚙️</span>
+                    <div class="mining-nav-text">
+                        <span class="mining-nav-label">Preprocessing</span>
+                        <span class="mining-nav-sub">Tokenization & TF-IDF</span>
+                    </div>
+                </button>
+                <button class="mining-nav-item" data-target="mining-association">
+                    <span class="mining-nav-icon">🔗</span>
+                    <div class="mining-nav-text">
+                        <span class="mining-nav-label">Association Rules</span>
+                        <span class="mining-nav-sub">Frequent Patterns</span>
+                    </div>
+                </button>
+                <button class="mining-nav-item" data-target="mining-classification">
+                    <span class="mining-nav-icon">🌲</span>
+                    <div class="mining-nav-text">
+                        <span class="mining-nav-label">Classification</span>
+                        <span class="mining-nav-sub">Supervised Learning</span>
+                    </div>
+                </button>
+                <button class="mining-nav-item" data-target="mining-clustering">
+                    <span class="mining-nav-icon">🔵</span>
+                    <div class="mining-nav-text">
+                        <span class="mining-nav-label">Clustering</span>
+                        <span class="mining-nav-sub">Unsupervised & Outlier Detection</span>
+                    </div>
+                </button>
+            </nav>
+
+            <div class="mining-sidebar-footer">
+                <div class="mining-algo-tag">Tech Stack</div>
+                <div class="mining-algo-list">TF-IDF · Apriori · K-Means · Random Forest · DuckDB</div>
+            </div>
+        </aside>
+
+        <!-- Main Content Panel -->
+        <main class="mining-main">
+
+            <!-- Top Bar -->
+            <div class="mining-topbar">
+                <div class="mining-breadcrumb">
+                    <span id="mining-active-module-name">Data Warehousing & ETL</span>
                 </div>
-                <div id="clustering-results"></div>
+                <div class="mining-course-tag">Automated Data Mining & Pattern Discovery System</div>
             </div>
 
-            <!-- Tab 3: Classification -->
-            <div id="mining-classification" class="mining-tab-content hidden">
-                <div class="mining-controls">
-                    <p>Train a Random Forest classifier to predict article categories.</p>
-                    <button id="run-classification" class="run-btn">Train Model</button>
+            <!-- ── Data Warehouse & ETL ── -->
+            <div id="mining-warehouse" class="mining-panel active-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2 class="panel-title">📦 Data Warehousing &amp; ETL</h2>
+                        <p class="panel-desc">Unified DuckDB warehouse integrating live news APIs (Guardian, Mediastack,
+                            NewsAPI) and archival CSV datasets via ETL pipelines.</p>
+                    </div>
                 </div>
-                <div id="classification-results"></div>
+
+                <!-- Data Source Options -->
+                <div class="warehouse-source-section">
+                    <div class="warehouse-source-row">
+
+                        <!-- Existing Local Data -->
+                        <div class="warehouse-source-card">
+                            <div class="source-card-header">
+                                <span class="source-card-icon">💾</span>
+                                <div>
+                                    <strong>Local Corpus</strong>
+                                    <p>Use existing dataset already loaded in the warehouse</p>
+                                </div>
+                            </div>
+                            <div id="local-data-info" class="source-card-meta">Checking local data...</div>
+                            <div class="source-card-actions">
+                                <button id="run-warehouse-stats" class="run-btn">📊 Load Stats</button>
+                                <button id="run-load-data" class="run-btn run-btn-secondary">🔄 Re-ingest Default
+                                    CSV</button>
+                                <select id="load-mode" class="param-input"
+                                    style="padding:6px 10px;font-size:12px;min-width:100px;">
+                                    <option value="replace">Replace All</option>
+                                    <option value="append">Append</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Upload New Data -->
+                        <div class="warehouse-source-card">
+                            <div class="source-card-header">
+                                <span class="source-card-icon">📤</span>
+                                <div>
+                                    <strong>Upload New Data</strong>
+                                    <p>Add a CSV file to expand the warehouse corpus</p>
+                                </div>
+                            </div>
+                            <div id="upload-drop-zone" class="upload-zone">
+                                <input type="file" id="csv-upload-input" accept=".csv" hidden>
+                                <div class="upload-zone-content">
+                                    <span class="upload-zone-icon">📁</span>
+                                    <span>Drop CSV here or <a href="#" id="upload-browse-link">browse</a></span>
+                                    <span class="upload-zone-hint">Auto-detects columns · Supports any news CSV
+                                        format</span>
+                                </div>
+                            </div>
+                            <div class="source-card-actions">
+                                <select id="upload-mode" class="param-input"
+                                    style="padding:6px 10px;font-size:12px;min-width:100px;">
+                                    <option value="append" selected>Append to existing</option>
+                                    <option value="replace">Replace all data</option>
+                                </select>
+                            </div>
+                            <div id="upload-status" class="upload-status-bar" style="display:none;"></div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Warehouse Statistics Results -->
+                <div id="warehouse-results" class="panel-results">
+                    <div class="placeholder-box">Click "Load Stats" to view warehouse statistics, or upload a new
+                        dataset.</div>
+                </div>
             </div>
-        </div>
-    </main>
+
+            <!-- ── MODULE 2: Preprocessing ── -->
+            <div id="mining-preprocessing" class="mining-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2 class="panel-title">⚙️ Data Preprocessing &amp; Transformation</h2>
+                        <p class="panel-desc">Tokenization → Stopword removal → TF-IDF vectorization → Dimensionality
+                            reduction pipeline.</p>
+                    </div>
+                    <div class="panel-actions">
+                        <button id="run-preprocessing-demo" class="run-btn">▶ Run Live Demo</button>
+                    </div>
+                </div>
+                <div id="preprocessing-results" class="panel-results">
+                    <div class="pipeline-steps">
+                        <div class="pipeline-step">
+                            <div class="step-icon">1</div>
+                            <div class="step-info"><strong>Tokenization</strong>
+                                <p>Split raw text into individual tokens</p>
+                            </div>
+                        </div>
+                        <div class="pipeline-arrow">→</div>
+                        <div class="pipeline-step">
+                            <div class="step-icon">2</div>
+                            <div class="step-info"><strong>Stopword Removal</strong>
+                                <p>Filter high-frequency noise words</p>
+                            </div>
+                        </div>
+                        <div class="pipeline-arrow">→</div>
+                        <div class="pipeline-step">
+                            <div class="step-icon">3</div>
+                            <div class="step-info"><strong>TF-IDF Vectors</strong>
+                                <p>Convert text to weighted numeric vectors</p>
+                            </div>
+                        </div>
+                        <div class="pipeline-arrow">→</div>
+                        <div class="pipeline-step">
+                            <div class="step-icon">4</div>
+                            <div class="step-info"><strong>Dim. Reduction</strong>
+                                <p>Top 10,000 features, unigrams + bigrams</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="preprocessing-output"></div>
+                </div>
+            </div>
+
+            <!-- ── MODULE 3: Association Rules ── -->
+            <div id="mining-association" class="mining-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2 class="panel-title">🔗 Association Rule Mining</h2>
+                        <p class="panel-desc">Frequent itemset analysis on news keywords to discover latent
+                            co-occurrence patterns (e.g., "Economic Reform" → "Policy Shifts", confidence 85%).</p>
+                    </div>
+                    <div class="panel-actions">
+                        <div class="param-row">
+                            <label>Min Support: <input type="number" id="min-support" value="0.05" min="0.01" max="0.5"
+                                    step="0.01" class="param-input"></label>
+                            <label>Min Confidence: <input type="number" id="min-confidence" value="0.2" min="0.1"
+                                    max="1.0" step="0.05" class="param-input"></label>
+                        </div>
+                        <button id="run-association" class="run-btn">🔍 Generate Rules</button>
+                    </div>
+                </div>
+                <div id="association-results" class="panel-results">
+                    <div class="placeholder-box">Adjust thresholds and run the algorithm to discover keyword
+                        relationships.</div>
+                </div>
+            </div>
+
+            <!-- ── MODULE 4: Classification ── -->
+            <div id="mining-classification" class="mining-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2 class="panel-title">🌲 Automated Classification</h2>
+                        <p class="panel-desc">Random Forest classifier trained on TF-IDF vectors to auto-categorize
+                            articles into Politics, Technology, Business, and more.</p>
+                    </div>
+                    <div class="panel-actions">
+                        <button id="run-classification" class="run-btn">🚀 Train &amp; Evaluate</button>
+                    </div>
+                </div>
+                <div id="classification-results" class="panel-results">
+                    <div class="placeholder-box">Click "Train & Evaluate" to run the Random Forest classifier. Takes
+                        ~15–30 seconds.</div>
+                </div>
+            </div>
+
+            <!-- ── MODULE 5: Clustering ── -->
+            <div id="mining-clustering" class="mining-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2 class="panel-title">🔵 Clustering &amp; Outlier Detection</h2>
+                        <p class="panel-desc">Unsupervised K-Means clustering aggregates articles into distinct topical
+                            clusters without prior labeling. Small clusters are flagged as potential outliers.</p>
+                    </div>
+                    <div class="panel-actions">
+                        <div class="param-row">
+                            <label>Clusters (K): <input type="number" id="num-clusters" value="5" min="2" max="10"
+                                    class="param-input"></label>
+                        </div>
+                        <button id="run-clustering" class="run-btn">▶ Run K-Means</button>
+                    </div>
+                </div>
+                <div id="clustering-results" class="panel-results">
+                    <div class="placeholder-box">Set K and run clustering to discover topic groups in the corpus.</div>
+                </div>
+            </div>
+
+        </main>
+    </div>
 
 
     <!-- Metrics Sidebar Toggle -->
@@ -165,7 +375,6 @@
                 <span class="status-label">Avg Relevance</span>
                 <span id="metric-score" class="status-value">-</span>
             </div>
-
             <div style="margin-top: 20px; padding: 12px; background: #f8f9fa; border-radius: 8px; font-size: 13px;">
                 <h4 style="font-size: 12px; margin-bottom: 8px; color: #555;">METRIC DEFINITIONS</h4>
                 <p style="margin-bottom: 6px; color: #666;"><strong>Precision:</strong> How accurate the results are.
@@ -204,7 +413,6 @@
                 <span class="status-label">LLM Service</span>
                 <span id="status-llm" class="status-value pending">Checking...</span>
             </div>
-
             <div class="sidebar-actions">
                 <button id="refresh-status" class="action-btn">Refresh Status</button>
             </div>
@@ -214,12 +422,13 @@
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay hidden">
         <div class="loader"></div>
-        <p>Searching...</p>
+        <p>Processing...</p>
     </div>
 
     <!-- Scripts -->
-    <script src="app.js"></script> <!-- Main controller -->
-    <script src="live-news.js"></script> <!-- New Live News -->
+    <script src="mode-toggle.js"></script> <!-- Mode toggle — FIRST -->
+    <script src="app.js"></script>
+    <script src="live-news.js"></script>
     <script src="analytics-mode.js"></script>
     <script src="mining-lab.js"></script>
 
