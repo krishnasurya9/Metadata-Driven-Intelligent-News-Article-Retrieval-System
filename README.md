@@ -1,19 +1,28 @@
 # Multi-Objective News Intelligence System
+
 > **A unified architecture serving two distinct academic domains: Information Retrieval Techniques (IRT) and Concepts of Data Mining (CDM).**
 
-This repository houses a comprehensive, offline-first AI pipeline that ingests digital news from multiple sources, indexes them for semantic search, and autonomously discovers underlying correlations and patterns.
+This repository houses a comprehensive, offline-first AI pipeline that ingests digital news from multiple sources, indexes them for hybrid semantic search, and autonomously discovers underlying correlations and patterns using advanced machine learning models.
+
+---
 
 ## 🚀 Core Methodologies
 
-### 🔍 Information Retrieval (IRT) Objective: *Metadata-Driven Intelligent News Retrieval System*
-*   **Contextual Search:** Overcomes standard keyword failure utilizing TF-IDF and BM25 algorithms for deep semantic retrieval.
-*   **Metadata Weighting:** Ranks documents not just on text similarity, but by assigning authoritative multipliers to publication dates, sources, and tags.
-*   **Explainable RAG:** Uses local small Language Models (LM Studio/Ollama) strictly as post-retrieval synthesizers to explain *why* specific documents ranked highly.
+### 🔍 Information Retrieval (IRT) Objective: *Metadata-Driven Intelligent News Retrieval*
+*   **Hybrid Search Formula:** Integrates native Sparse retrieval (BM25) with Dense semantic embeddings (FAISS via `all-MiniLM-L6-v2`) and a configurable Metadata boosting algorithm (Recency + Category alignment).
+*   **Zero-Score Scaling:** Intelligently floors `0.0` BM25 scores to prevent vector-multiplier penalties when resolving purely semantic queries.
+*   **Mathematical Evaluation:** Features a robust evaluation pipeline (`evaluate_ir.py`) generating synthetic ground-truth targets to algorithmically plot Precision-Recall Curves and calculate Mean Average Precision (MAP).
+*   **Explainable RAG:** Uses local Language Models (via LM Studio on Port 1234) as post-retrieval synthesizers to explain *why* specific documents ranked highly.
 
-### ⛏️ Data Mining (CDM) Objective: *Automated Data Mining & Pattern Discovery System*
-*   **Embedded Warehousing:** Operates a local DuckDB data warehouse to ingest massive, heterogeneous CSVs (like AG News) and live API streams seamlessly.
-*   **Pattern Discovery:** Transitions raw text into tokenized mathematical matrices to enable Unsupervised Topic Discovery (K-Means/DBSCAN) and Classification (SVM).
-*   **Dashboard Visualization:** Replaces query-based search with an "Analytics Mode" to visually plot Feature Correlation, Source Biases, and Category Distributions across time.
+### ⛏️ Data Mining (CDM) Objective: *Automated Pattern Discovery System*
+The "Mining Lab" utilizes a 120,000-document *Frozen Corpus* (AG News) to ensure replicable academic benchmarks, implementing 5 advanced algorithms:
+*   **Embedded Warehousing:** Operates a local DuckDB data warehouse to unify raw CSVs and live API streams seamlessly.
+*   **Bisecting K-Means + LSA Clustering:** Utilizes TruncatedSVD for dimensional reduction on high-dimensional TF-IDF vectors, featuring an autonomous Elbow Curve generation endpoint for optimal `K` discovery.
+*   **Classification Benchmarking:** A Dual-Model pipeline evaluating **Naive Bayes** vs. **Linear SVM** via real-time training, emitting complete classification matrices and interactive confusion grids.
+*   **FP-Growth Association Rules:** Eliminates sparse tag limitations by mining association rules strictly from the top TF-IDF unigrams/bigrams per document.
+*   **Advanced Analytics:** Introduces **Temporal Pattern Mining** (Time-Series linear regression) and **Keyword Prominence Analysis** (Global vs. Category-defining vocabulary mapping).
+
+---
 
 ## 🛠️ Setup & Installation
 
@@ -29,7 +38,7 @@ This repository houses a comprehensive, offline-first AI pipeline that ingests d
     ```
 
 3.  **Environment Configuration**
-    Create a `.env` file in `code/` with your API keys:
+    Create a `.env` file in `code/backend/` with your API keys (optional, but triggers live data streams):
     ```env
     GUARDIAN_API_KEY=your_key_here
     MEDIASTACK_API_KEY=your_key_here
@@ -40,53 +49,57 @@ This repository houses a comprehensive, offline-first AI pipeline that ingests d
     ```bash
     python code/backend/app.py
     ```
-    Access the web interface at `http://localhost:5000`.
+    Access the dynamic web interface at `http://localhost:5000/api/health`. Open `code/frontend/index.html` in your browser.
 
-## 📊 Data Integration & Ingestion
+---
 
-The system supports two primary methods for data ingestion:
+## 📊 Data Integration & Evaluation
 
-### 1. Live News Fetching (Automatic)
-The system is designed to automatically fetch news in the background when the application starts.
-- **Mechanism**: `news_fetcher.py` runs a background thread that queries configured APIs.
-- **Sources**:
-    - **The Guardian**: Requires `GUARDIAN_API_KEY`.
-    - **Mediastack**: Requires `MEDIASTACK_API_KEY`. Supports multiple keys (`MEDIASTACK_API_KEY_1`, etc.) for higher volume.
-    - **NewsAPI**: Requires `NEWS_API_KEY`.
-- **Storage**: Fetched articles are deduplicated (by URL/title) and stored in `code/data/news_corpus.duckdb`.
+### 1. Live News Fetching
+If API keys are detected, `app.py` triggers `news_fetcher.py`. This spawns a background thread querying The Guardian, Mediastack, and NewsAPI, automatically ingesting and indexing live text into the unified DuckDB warehouse.
 
-### 2. CSV Bulk Import (Manual)
-You can import historical data from CSV files.
-- **File Format**: CSV file should have headers like `headline`, `content`, `date`, `category`, `source`.
-- **How to Import**:
-    1. Place your CSV file in a known location.
-    2. Use the `database.load_articles_from_csv(file_path)` function via a Python script or console.
-    3. Run `rebuild_index.py` to update the search index.
-
-### 3. Rebuilding the Index
-If you manually modify the database or import bulk data, you **must** rebuild the search index:
+### 2. Manual Data Ingestion & Rebuilding
+If you import bulk historical data, you **must** sync the FAISS and BM25 indices:
 ```bash
-python code/backend/rebuild_index.py
+python code/backend/scripts/rebuild_index.py
 ```
-This script:
-1. Loads all documents from DuckDB.
-2. Re-calculates TF-IDF and BM25 scores.
-3. Saves the updated indices to `code/data/*.pkl`.
+
+### 3. Evaluating System Accuracy (IRT)
+Showcase the mathematical rigor of the search engine by running the synthetic evaluation pipeline:
+```bash
+python code/backend/scripts/evaluate_ir.py
+```
+This will compile the `Evaluation_Metrics.md` report and generate a Precision-Recall Curve Plot.
+
+### 4. Testing CDM Algorithms
+To verify that the offline K-Means and SVM classifiers map correctly to the 120k Frozen Corpus without crashing memory limits:
+```bash
+python code/test_cdm.py
+```
+
+---
 
 ## 📁 Project Structure
 
-```
+```text
 .
 ├── code/
 │   ├── backend/          # Python Flask backend & logic
-│   │   ├── app.py        # Main entry point
-│   │   ├── database.py   # DuckDB interactions
-│   │   ├── ir_engine.py  # Search algorithms
-│   │   └── ...
-│   ├── frontend/         # Static HTML/JS frontend
-│   │   ├── index.html
-│   │   └── ...
-│   └── data/             # Data storage (indices, DB)
-├── plan/                 # Project planning docs
+│   │   ├── app.py        # Main entry point & API Router
+│   │   ├── ir_engine.py  # Hybrid FAISS + BM25 Search
+│   │   ├── mining_engine.py # Active corpus CDM analytics
+│   │   └── scripts/      # Standalone testing & ingestion utilities
+│   │       ├── evaluate_ir.py
+│   │       ├── rebuild_index.py
+│   │       └── ...
+│   ├── cdm_analytics/    # Frozen Corpus specific mining modules
+│   │   ├── clustering.py # Bisecting K-Means + Elbow 
+│   │   └── classification.py # SVM vs NB Benchmarker
+│   ├── cdm_data/         # Houses frozen_corpus.csv (AG News)
+│   ├── data/             # Live DuckDB warehouse and FAISS bins
+│   └── frontend/         # Vanilla HTML/JS frontend (+ Chart.js)
+├── ppts/                 # Academic Presentation reports
+├── reviews/              # Grading rubrics and Review printouts
+├── Evaluation_Metrics.md # Auto-generated system accuracy report
 └── README.md             # This file
 ```

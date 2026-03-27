@@ -12,8 +12,8 @@ import requests
 from typing import List, Dict, Any, Optional
 
 # LM Studio Configuration (OpenAI-compatible API)
-# Default LM Studio endpoint - runs on localhost:961
-LM_STUDIO_URL = "http://localhost:961/v1/chat/completions"
+# Default LM Studio endpoint - runs on localhost:1234
+LM_STUDIO_URL = "http://localhost:1234/v1/chat/completions"
 
 # Ollama Configuration (alternative)
 OLLAMA_URL = "http://localhost:11434/api/generate"
@@ -29,7 +29,7 @@ def detect_provider() -> str:
     
     # Try LM Studio first (most common for local use)
     try:
-        response = requests.get("http://localhost:961/v1/models", timeout=2)
+        response = requests.get("http://localhost:1234/v1/models", timeout=2)
         if response.status_code == 200:
             _active_provider = "lm_studio"
             return "lm_studio"
@@ -288,7 +288,7 @@ def get_status() -> Dict[str, Any]:
     
     if provider == "lm_studio":
         try:
-            response = requests.get("http://localhost:961/v1/models", timeout=2)
+            response = requests.get("http://localhost:1234/v1/models", timeout=2)
             models = response.json().get('data', [])
             return {
                 "status": "available",

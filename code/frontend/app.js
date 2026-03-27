@@ -475,19 +475,21 @@ async function checkSystemStatus() {
 
             // Database
             if (elements.statusDb) {
-                elements.statusDb.textContent = data.database === 'connected' ? 'Connected' : 'Error';
-                elements.statusDb.className = data.database === 'connected' ? 'status-value online' : 'status-value offline';
+                const dbConnected = data.corpus_count !== undefined;
+                elements.statusDb.textContent = dbConnected ? 'Connected' : 'Error';
+                elements.statusDb.className = dbConnected ? 'status-value online' : 'status-value offline';
             }
 
             // Index
             if (elements.statusIndex) {
-                elements.statusIndex.textContent = `${data.documents_indexed} docs`;
+                const docsCount = data.index_status ? data.index_status.documents_indexed : 0;
+                elements.statusIndex.textContent = `${docsCount} docs`;
                 elements.statusIndex.className = 'status-value';
             }
 
             // LLM
             if (elements.statusLlm) {
-                const llmStatus = data.llm || 'unavailable';
+                const llmStatus = data.llm_status ? data.llm_status.status : 'unavailable';
                 elements.statusLlm.textContent = llmStatus === 'available' ? 'Ready' : 'Offline';
                 elements.statusLlm.className = llmStatus === 'available' ? 'status-value online' : 'status-value offline';
             }

@@ -1,45 +1,22 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Virtual Environment
+# Virtual Environments
 venv/
-env/
-ENV/
 .env
+__pycache__/
+*.pyc
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# Project specific
-*.db
-*.duckdb
-*.sqlite3
-*.pkl
-code/data/news_corpus.duckdb
-code/data/*.pkl
-
+# Datasets & Ingestion
+code/data/
+code/cdm_data/
 *.csv
-code/data/*.csv
+*.tsv
+
+# Models & Indices
+*.pkl
+*.faiss
+*.duckdb
+*.duckdb.wal
+
+# IDE / System
+.vscode/
+.idea/
+.DS_Store

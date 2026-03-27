@@ -10,6 +10,7 @@ import pickle
 import os
 import time
 import json
+from datetime import datetime
 
 from preprocessor import preprocess_text
 import vector_engine
@@ -178,11 +179,12 @@ def load_index() -> bool:
 def search(query: str, documents: List[Dict], filters: Dict = None,
            boost_recency: bool = False, boost_category: bool = False,
            target_category: str = None, top_k: int = 50,
-           alpha: float = 0.4, beta: float = 0.6) -> Dict[str, Any]:
+           alpha: float = 0.4, beta: float = 0.4, gamma: float = 0.2) -> Dict[str, Any]:
     """
-    Perform Hybrid Search (BM25 + Vector)
-    alpha: Weight for BM25 (default 0.4)
-    beta: Weight for Vector (default 0.6)
+    Perform Hybrid Search (BM25 + Vector + Meta)
+    alpha: Weight for BM25
+    beta: Weight for Vector
+    gamma: Weight for Metadata
     """
     global _bm25, _doc_ids
     
@@ -237,12 +239,33 @@ def search(query: str, documents: List[Dict], filters: Dict = None,
         s_bm25 = bm25_scores.get(doc_id, 0.0)
         s_vec = vector_scores.get(doc_id, 0.0)
         
+        # Zero-score floor for BM25
+        if s_bm25 == 0.0 and s_vec > 0.0:
+            s_bm25 = 0.001
+            
+        # Metadata Score Calculation
+        recency_score = 0.1
+        pub_at = doc.get('published_at')
+        if pub_at:
+            try:
+                if isinstance(pub_at, str):
+                    pub_date = datetime.fromisoformat(pub_at.replace('Z', '+00:00')).replace(tzinfo=None)
+                else:
+                    pub_date = pub_at
+                days_old = (datetime.now() - pub_date).days
+                if days_old <= 30:
+                    recency_score = 1.0
+                elif days_old <= 90:
+                    recency_score = 0.7
+                elif days_old <= 365:
+                    recency_score = 0.4
+            except:
+                pass
+
+        category_score = 1.0 if doc.get('category') == target_category else 0.0
+        s_meta = (0.6 * recency_score) + (0.4 * category_score)
         
-        final_score = (alpha * s_bm25) + (beta * s_vec)
-        
-        # Metadata Boosting
-        if boost_category and target_category and doc.get('category') == target_category:
-            final_score *= 1.2
+        final_score = (alpha * s_bm25) + (beta * s_vec) + (gamma * s_meta)
             
         final_results.append({
             "doc_id": doc_id,
@@ -263,28 +286,48 @@ def search(query: str, documents: List[Dict], filters: Dict = None,
     # Sort
     final_results.sort(key=lambda x: x['score'], reverse=True)
     
+    bottom = final_results[-10:] if len(final_results) >= 10 else final_results
+    
     return {
         "status": "success",
         "query": query,
         "total_results": len(final_results),
         "top_results": final_results[:top_k],
-        "bottom_results": []
+        "bottom_results": bottom
     }
 
-def calculate_metrics(results: List[Dict], k: int = 20) -> Dict[str, float]:
-    """Calculate basic metrics for results"""
+def calculate_metrics(results: List[Dict], k: int = 10) -> Dict[str, float]:
+    """Calculate metrics for results"""
     if not results:
-        return {"precision_at_k": 0.0, "recall_at_k": 0.0}
+        return {"precision": 0.0, "recall": 0.0, "f1": 0.0, "map": 0.0, "average_score": 0.0}
     
     top_score = results[0]['score'] if results else 0
     relevant_threshold = top_score * 0.5
     
-    relevant_retrieved = sum(1 for r in results[:k] if r['score'] >= relevant_threshold)
+    relevant_in_top_k = sum(1 for r in results[:k] if r['score'] >= relevant_threshold)
+    precision_at_k = float(relevant_in_top_k) / k if k > 0 else 0.0
     
+    total_relevant_estimated = sum(1 for r in results if r['score'] >= relevant_threshold)
+    recall_at_k = float(relevant_in_top_k) / total_relevant_estimated if total_relevant_estimated > 0 else 0.0
+    
+    f1 = (2 * precision_at_k * recall_at_k) / (precision_at_k + recall_at_k) if (precision_at_k + recall_at_k) > 0 else 0.0
+    
+    ap_sum = 0.0
+    rel_count = 0
+    for i, r in enumerate(results[:k], 1):
+        if r['score'] >= relevant_threshold:
+            rel_count += 1
+            ap_sum += rel_count / i
+    map_approx = ap_sum / total_relevant_estimated if total_relevant_estimated > 0 else 0.0
+
+    avg_score = sum(r['score'] for r in results[:k]) / len(results[:k]) if results[:k] else 0.0
+
     return {
-        "precision_at_k": round(relevant_retrieved / k, 4),
-        "recall_at_k": 1.0, 
-        "total_results": len(results)
+        "precision": float(round(precision_at_k, 4)),
+        "recall": float(round(recall_at_k, 4)),
+        "f1": float(round(f1, 4)),
+        "map": float(round(map_approx, 4)),
+        "average_score": float(round(avg_score, 4))
     }
 
 def get_index_info() -> Dict[str, Any]:
