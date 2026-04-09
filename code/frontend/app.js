@@ -189,7 +189,7 @@ async function performSearch(query, feelingLucky = false) {
 
     if (result.status === 'success') {
         state.allResults = result.top_results || [];
-        state.currentSummary = result.llm_summary || null;
+        state.currentSummary = null;
 
         if (feelingLucky && state.allResults.length > 0) {
             // Open first result (simulate)
@@ -200,8 +200,13 @@ async function performSearch(query, feelingLucky = false) {
         showResultsPage();
         renderResults();
 
-        // If we have a summary but no results (fallback mode), ensure summary is shown
-        renderSummary();
+        // Show AI Summary loading state, then fetch
+        if (state.allResults.length > 0) {
+            showSummaryLoading();
+            fetchAISummary(query, state.allResults, result.bottom_results || []);
+        } else {
+            elements.searchSummary.classList.add('hidden');
+        }
 
         // Update Metrics Sidebar
         if (result.metrics) {
@@ -230,9 +235,8 @@ function updateMetrics(metrics) {
 // UI Functions
 function showHomePage() {
     elements.mainView.classList.remove('hidden');
-    elements.mainAnalytics.classList.add('hidden');
+    document.getElementById('analytics-view')?.classList.add('hidden');
     elements.mainMining?.classList.add('hidden');
-
 
     // Reset view
     elements.searchHero.style.display = 'block';
@@ -247,13 +251,12 @@ function showHomePage() {
 
 function showResultsPage() {
     elements.mainView.classList.remove('hidden');
-    elements.mainAnalytics.classList.add('hidden');
+    document.getElementById('analytics-view')?.classList.add('hidden');
     elements.mainMining?.classList.add('hidden');
-
 
     // Transition to results view
     elements.searchHero.style.display = 'none';
-    elements.liveNewsContainer.classList.add('hidden'); // Optional: Hide news on search results
+    elements.liveNewsContainer.classList.add('hidden');
     elements.resultsContainer.classList.remove('hidden');
 
     elements.queryInput.value = state.currentQuery;
@@ -263,17 +266,21 @@ function showResultsPage() {
 
 function showAnalyticsPage() {
     elements.mainView.classList.add('hidden');
-    elements.mainAnalytics.classList.remove('hidden');
+    const analyticsView = document.getElementById('analytics-view');
+    if (analyticsView) analyticsView.classList.remove('hidden');
     elements.mainMining?.classList.add('hidden');
 
-
     updateNavButtons('analytics');
-    loadAnalytics();
+
+    // Auto-load analytics data if not yet loaded
+    if (window.AnalyticsMode && !window.AnalyticsMode.loaded) {
+        window.AnalyticsMode.loadAll();
+    }
 }
 
 function showMiningPage() {
     elements.mainView.classList.add('hidden');
-    elements.mainAnalytics.classList.add('hidden');
+    document.getElementById('analytics-view')?.classList.add('hidden');
     elements.mainMining?.classList.remove('hidden');
 
     updateNavButtons('mining');
@@ -310,6 +317,12 @@ function updateNavButtons(activeMode) {
 function showLoading(show) {
     state.isLoading = show;
     elements.loadingOverlay.classList.toggle('hidden', !show);
+    
+    // Toggle the new progress bar
+    const progressBar = document.getElementById('search-progress-bar');
+    if (progressBar) {
+        progressBar.classList.toggle('hidden', !show);
+    }
 }
 
 function renderResults() {
@@ -415,10 +428,55 @@ function renderSummary() {
     const summary = state.currentSummary;
     if (summary) {
         elements.searchSummary.classList.remove('hidden');
-        elements.summaryText.textContent = summary;
+        elements.summaryText.innerHTML = formatSummaryText(summary);
     } else {
         elements.searchSummary.classList.add('hidden');
     }
+}
+
+function showSummaryLoading() {
+    elements.searchSummary.classList.remove('hidden');
+    elements.summaryText.innerHTML = `
+        <span class="summary-loading">
+            <span class="summary-shimmer-line"></span>
+            <span class="summary-shimmer-line short"></span>
+            <span class="summary-shimmer-line medium"></span>
+        </span>
+    `;
+}
+
+async function fetchAISummary(query, topResults, bottomResults) {
+    try {
+        const response = await apiCall('/llm/summarize', {
+            method: 'POST',
+            body: JSON.stringify({
+                query: query,
+                top_results: topResults.slice(0, 5),
+                bottom_results: bottomResults.slice(0, 3)
+            })
+        });
+
+        if (response.status === 'success' && response.data?.summary) {
+            state.currentSummary = response.data.summary;
+            renderSummary();
+        } else {
+            // Fallback: hide the box if no summary at all
+            elements.searchSummary.classList.add('hidden');
+        }
+    } catch (e) {
+        console.warn('AI Summary fetch failed:', e);
+        elements.searchSummary.classList.add('hidden');
+    }
+}
+
+function formatSummaryText(text) {
+    if (!text) return '';
+    // Convert **bold** → <strong>, numbered lists, and newlines → paragraphs
+    return escapeHtml(text)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/^(\d+\.\s)/gm, '<br><span class="summary-list-num">$1</span>')
+        .replace(/\n{2,}/g, '</p><p>')
+        .replace(/\n/g, '<br>');
 }
 
 function goToPage(page) {
@@ -463,10 +521,12 @@ async function checkSystemStatus() {
 
     try {
         const startTime = performance.now();
-        const data = await apiCall('/health');
+        const response = await fetch(`${API_BASE}/health`);
+        const dataJson = await response.json();
         const latency = Math.round(performance.now() - startTime);
 
-        if (data && data.status) {
+        if (dataJson && dataJson.status === "success") {
+            const data = dataJson.data;
             // Backend Online
             if (elements.statusBackend) {
                 elements.statusBackend.textContent = `Online (${latency}ms)`;
@@ -475,7 +535,8 @@ async function checkSystemStatus() {
 
             // Database
             if (elements.statusDb) {
-                const dbConnected = data.corpus_count !== undefined;
+                const dbStatus = data.db_status;
+                const dbConnected = dbStatus && dbStatus.status === 'online';
                 elements.statusDb.textContent = dbConnected ? 'Connected' : 'Error';
                 elements.statusDb.className = dbConnected ? 'status-value online' : 'status-value offline';
             }

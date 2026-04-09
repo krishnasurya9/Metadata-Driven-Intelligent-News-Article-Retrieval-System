@@ -7,13 +7,19 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import threading
 from dotenv import load_dotenv
+import sys
+import traceback
+from functools import wraps
+
+# Add the parent code directory to Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import database
 import ir_engine
 import mining_engine
 import analytics_engine
 import llm_service
-from news_fetcher import NewsFetcher
+import news_fetcher
 import cdm_analytics.preprocessing as cdm_prep
 import cdm_analytics.clustering as cdm_clust
 import cdm_analytics.classification as cdm_class
@@ -23,11 +29,11 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-news_fetcher = NewsFetcher()
 last_metrics = {"precision": 0.0, "recall": 0.0, "f1": 0.0, "map": 0.0, "average_score": 0.0}
 
 # Decorator to run mining_engine on frozen corpus
 def with_frozen_corpus(func):
+    @wraps(func)
     def wrapper(*args, **kwargs):
         original = mining_engine._get_data_for_mining
         mining_engine._get_data_for_mining = cdm_prep.load_frozen_data
@@ -43,12 +49,16 @@ def with_frozen_corpus(func):
 @app.route('/api/health', methods=['GET'])
 def health_check():
     try:
+        db_status = database.get_db_status()
+        corpus_count = db_status.get("document_count", 0) if db_status.get("status") == "online" else 0
+        
         return jsonify({
             "status": "success",
             "data": {
                 "index_status": ir_engine.get_index_info(),
                 "llm_status": llm_service.get_status(),
-                "corpus_count": database.get_corpus_stats().get("total_articles", 0),
+                "corpus_count": corpus_count,
+                "db_status": db_status,
                 "fetch_status": news_fetcher.get_status()
             }
         })
@@ -65,7 +75,7 @@ def get_stats():
 @app.route('/api/categories', methods=['GET'])
 def get_categories():
     try:
-        cats = [c['category'] for c in database.execute_query("SELECT DISTINCT category FROM articles WHERE category IS NOT NULL")]
+        cats = [c['category'] for c in database.execute_query("SELECT DISTINCT category FROM news_articles WHERE category IS NOT NULL")]
         return jsonify({"status": "success", "data": cats})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -73,7 +83,7 @@ def get_categories():
 @app.route('/api/sources', methods=['GET'])
 def get_sources():
     try:
-        srcs = [s['source'] for s in database.execute_query("SELECT DISTINCT source FROM articles WHERE source IS NOT NULL")]
+        srcs = [s['source'] for s in database.execute_query("SELECT DISTINCT source FROM news_articles WHERE source IS NOT NULL")]
         return jsonify({"status": "success", "data": srcs})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -107,12 +117,22 @@ def load_data():
         if not os.path.exists(full_path):
              return jsonify({"status": "error", "message": f"File not found: {full_path}"}), 404
              
+        # Before load, track count
+        count_before = database.get_corpus_stats().get('total_articles', 0)
         res = database.load_articles_from_csv(full_path, mode=mode)
+        count_after = database.get_corpus_stats().get('total_articles', 0)
         
-        if database.get_corpus_stats().get('total_articles', 0) > 0:
-            threading.Thread(target=ir_engine.build_index).start()
+        new_docs_count = count_after - count_before
+        
+        if count_after > 0:
+            if mode == 'append' and count_before > 0 and new_docs_count > 0:
+                print(f"Triggering incremental update for {new_docs_count} documents...")
+                new_docs = database.execute_query(f"SELECT * FROM news_articles ORDER BY rowid DESC LIMIT {new_docs_count}")
+                threading.Thread(target=ir_engine.update_index, args=(database.get_all_articles(), new_docs)).start()
+            else:
+                threading.Thread(target=ir_engine.build_index, args=(database.get_all_articles(),)).start()
             
-        return jsonify({"status": "success", "data": res, "message": "Triggered index rebuild in background"})
+        return jsonify({"status": "success", "data": res, "message": "Triggered index update in background"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -126,13 +146,21 @@ def upload_data():
             return jsonify({"status": "error", "message": "No selected file"}), 400
             
         mode = request.form.get('mode', 'append')
-        save_dir = os.path.join(os.path.dirname(__file__), '..', 'cdm_data')
+        save_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'cdm_data')
         os.makedirs(save_dir, exist_ok=True)
         path = os.path.join(save_dir, file.filename)
         file.save(path)
         
+        count_before = database.get_corpus_stats().get('total_articles', 0)
         res = database.load_articles_from_csv(path, mode=mode)
-        threading.Thread(target=ir_engine.build_index).start()
+        count_after = database.get_corpus_stats().get('total_articles', 0)
+        new_docs_count = count_after - count_before
+        
+        if mode == 'append' and count_before > 0 and new_docs_count > 0:
+            new_docs = database.execute_query(f"SELECT * FROM news_articles ORDER BY rowid DESC LIMIT {new_docs_count}")
+            threading.Thread(target=ir_engine.update_index, args=(database.get_all_articles(), new_docs)).start()
+        else:
+            threading.Thread(target=ir_engine.build_index, args=(database.get_all_articles(),)).start()
         
         return jsonify({"status": "success", "data": res})
     except Exception as e:
@@ -173,7 +201,7 @@ def get_fetch_status():
 @app.route('/api/live-news', methods=['GET'])
 def get_live_news():
     try:
-        top_news = database.execute_query("SELECT * FROM articles ORDER BY published_at DESC LIMIT 50")
+        top_news = database.execute_query("SELECT * FROM news_articles ORDER BY published_at DESC LIMIT 50")
         return jsonify({"status": "success", "data": top_news})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -185,8 +213,10 @@ def get_live_news():
 def search():
     global last_metrics
     try:
+        print("Received search request.")
         data = request.json or {}
         query = data.get('query', '')
+        print(f"Query: {query}")
         if not query:
             return jsonify({"status": "error", "message": "Empty query"}), 400
             
@@ -197,17 +227,25 @@ def search():
         boost_category = data.get('boost_category', True)
         target_category = data.get('target_category')
         
+        print("Fetching all articles for search...")
         docs = database.get_all_articles()
+        print(f"Fetched {len(docs)} articles.")
+        
+        print("Calling ir_engine.search...")
         res = ir_engine.search(query, docs, boost_recency=boost_recency, boost_category=boost_category, 
                                target_category=target_category, alpha=alpha, beta=beta, gamma=gamma)
+        print("ir_engine.search completed.")
                                
-        if res['status'] == 'success':
-            last_metrics = res['metrics']
+        if res.get('status') == 'success':
+            last_metrics = res.get('metrics', last_metrics)
             # background summary
-            threading.Thread(target=llm_service.generate_search_summary, args=(query, res['results'], res['bottom_results'])).start()
+            if 'top_results' in res and 'bottom_results' in res:
+                threading.Thread(target=llm_service.generate_search_summary, args=(query, res.get('top_results'), res.get('bottom_results'))).start()
             
         return jsonify(res)
     except Exception as e:
+        print("Error during search:")
+        traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/metrics', methods=['GET'])
@@ -220,7 +258,7 @@ def get_last_metrics():
 @app.route('/api/index/rebuild', methods=['POST'])
 def rebuild_index():
     try:
-        res = ir_engine.build_index()
+        res = ir_engine.build_index(database.get_all_articles())
         return jsonify({"status": "success", "data": res})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -255,82 +293,10 @@ def llm_status():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ==========================================
-# MINING ROUTES (MAIN DB)
+# MINING ROUTES — REMOVED (superseded by /api/cdm/* frozen-corpus routes)
+# Legacy /api/mining/* endpoints operated on live main DB without frozen-corpus
+# decorators and have been replaced. Kept comment for audit trail.
 # ==========================================
-@app.route('/api/mining/cluster', methods=['POST'])
-def mining_cluster():
-    try:
-        data = request.json or {}
-        n = int(data.get('n_clusters', 4))
-        res = mining_engine.perform_clustering(n)
-        return jsonify({"status": "success", "data": res}) if "error" not in res else jsonify({"status": "error", "message": res["error"]}), 500 if "error" in res else 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/api/mining/classify', methods=['POST'])
-def mining_classify():
-    try:
-        res = mining_engine.train_classifier()
-        return jsonify({"status": "success", "data": res}) if "error" not in res else jsonify({"status": "error", "message": res["error"]}), 500 if "error" in res else 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/api/mining/association', methods=['POST'])
-def mining_assoc():
-    try:
-        data = request.json or {}
-        res = mining_engine.generate_association_rules(
-            min_support=float(data.get('min_support', 0.01)),
-            min_confidence=float(data.get('min_confidence', 0.3)),
-            min_lift=float(data.get('min_lift', 1.0))
-        )
-        return jsonify({"status": "success", "data": res}) if "error" not in res else jsonify({"status": "error", "message": res["error"]}), 500 if "error" in res else 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/api/mining/temporal', methods=['POST'])
-def mining_temporal():
-    try:
-        res = mining_engine.analyze_temporal_patterns()
-        return jsonify({"status": "success", "data": res}) if "error" not in res else jsonify({"status": "error", "message": res["error"]}), 500 if "error" in res else 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/api/mining/keywords', methods=['POST'])
-def mining_keywords():
-    try:
-        data = request.json or {}
-        res = mining_engine.analyze_keyword_prominence(int(data.get('top_n', 50)))
-        return jsonify({"status": "success", "data": res}) if "error" not in res else jsonify({"status": "error", "message": res["error"]}), 500 if "error" in res else 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/api/mining/predict', methods=['POST'])
-def mining_predict():
-    try:
-        data = request.json or {}
-        res = mining_engine.predict_category(data.get('text', ''))
-        return jsonify({"status": "success", "data": res}) if "error" not in res else jsonify({"status": "error", "message": res["error"]}), 500 if "error" in res else 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-# ==========================================
-# ANALYTICS ROUTES (MAIN DB)
-# ==========================================
-@app.route('/api/analytics', methods=['POST'])
-def do_analytics():
-    try:
-        data = request.json or {}
-        atype = data.get('type')
-        if atype == 'category_distribution': res = analytics_engine.analyze_category_distribution()
-        elif atype == 'term_frequency': res = analytics_engine.analyze_term_frequency(data.get('category'), data.get('top_n', 20))
-        elif atype == 'entity_extraction': res = analytics_engine.extract_entities(data.get('text',''))
-        elif atype == 'source_bias': res = analytics_engine.analyze_source_bias(data.get('topic'))
-        elif atype == 'time_series': res = analytics_engine.analyze_time_series(data.get('category'), data.get('interval', 'M'))
-        else: return jsonify({"status": "error", "message": "Invalid analytics type"}), 400
-        return jsonify(res)
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
 
 # ==========================================
 # CDM ROUTES (FROZEN CORPUS ONLY)
@@ -378,6 +344,19 @@ def cdm_predict():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/api/cdm/pca', methods=['POST'])
+@with_frozen_corpus
+def cdm_pca():
+    """2D PCA scatter data for cluster visualization (CDM-plan: Scatter Plots)."""
+    try:
+        data = request.json or {}
+        n_clusters = int(data.get('n_clusters', 4))
+        sample_size = int(data.get('sample_size', 1500))
+        res = mining_engine.get_cluster_pca_data(n_clusters=n_clusters, sample_size=sample_size)
+        return jsonify({"status": "success", "data": res}) if "error" not in res else jsonify({"status": "error", "message": res["error"]}), 500 if "error" in res else 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/cdm/association', methods=['POST'])
 @with_frozen_corpus
 def cdm_assoc():
@@ -411,9 +390,11 @@ def cdm_keywords():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+def initialize_index():
+    ir_engine.check_and_build_index()
+
 if __name__ == '__main__':
     database.init_database()
-    ir_engine.load_index()
-    if any([os.getenv('GUARDIAN_API_KEY'), os.getenv('MEDIASTACK_API_KEY'), os.getenv('NEWS_API_KEY')]):
-        news_fetcher.start_background_fetch()
+    initialize_index()
+    # news_fetcher.start_background_fetch() # Intentionally disabled at startup so it doesn't overwrite the FAISS index.
     app.run(host='0.0.0.0', port=5000, debug=False)

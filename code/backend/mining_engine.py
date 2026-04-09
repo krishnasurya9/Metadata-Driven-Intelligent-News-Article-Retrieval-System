@@ -127,6 +127,57 @@ def perform_clustering(n_clusters=4, method='bisecting'):
         "interpretation": f"Bisecting K-Means grouped {len(df)} articles into {n_clusters} clusters. Silhouette score is {sil_score:.3f} and overall purity is {overall_purity:.3f}."
     }
 
+
+# =========================================================================
+# 1b. PCA Scatter -- 2D projection of cluster assignments (CDM: Scatter Plots)
+# =========================================================================
+
+def get_cluster_pca_data(n_clusters=4, sample_size=1500):
+    """2D PCA scatter: TF-IDF -> LSA(100d) -> SVD-2d. Returns x,y,cluster,category,title per doc."""
+    df = _get_data_for_mining()
+    if df.empty:
+        return {"error": "No data"}
+
+    df['combined_text'] = df['title'].fillna('') + " " + df['content'].fillna('')
+    sampled = False
+    if len(df) > sample_size:
+        df = df.sample(n=sample_size, random_state=42).reset_index(drop=True)
+        sampled = True
+
+    vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(1,2), stop_words='english', sublinear_tf=True)
+    X_tfidf = vectorizer.fit_transform(df['combined_text'])
+    svd_high = TruncatedSVD(n_components=min(100, X_tfidf.shape[1]-1), random_state=42)
+    X_lsa = svd_high.fit_transform(X_tfidf)
+
+    bkmeans = BisectingKMeans(n_clusters=n_clusters, random_state=42)
+    labels = bkmeans.fit_predict(X_lsa)
+
+    # Project to 2D
+    svd_2d = TruncatedSVD(n_components=2, random_state=42)
+    X_2d = svd_2d.fit_transform(X_lsa)
+
+    points = [{"x": round(float(X_2d[i,0]),4), "y": round(float(X_2d[i,1]),4),
+               "cluster": int(labels[i]),
+               "category": str(df.iloc[i].get('category','Unknown')),
+               "title": str(df.iloc[i].get('title',''))[:80]}
+              for i in range(len(df))]
+
+    cluster_labels = {}
+    df_tmp = df.copy()
+    df_tmp['_c'] = labels
+    for cid in range(n_clusters):
+        mask = df_tmp['_c'] == cid
+        if mask.sum() > 0 and 'category' in df_tmp.columns:
+            dom = df_tmp.loc[mask, 'category'].value_counts()
+            cluster_labels[str(cid)] = str(dom.index[0]) if len(dom) > 0 else ("Cluster " + str(cid+1))
+        else:
+            cluster_labels[str(cid)] = "Cluster " + str(cid+1)
+
+    return {"method": "2D PCA Scatter (TF-IDF -> LSA -> SVD-2D)", "n_clusters": n_clusters,
+            "total_points": len(points), "sampled": sampled,
+            "sample_size": sample_size if sampled else len(df),
+            "cluster_labels": cluster_labels, "points": points}
+
 # =========================================================================
 # 2. Classification (Dual Classifier Benchmark)
 # =========================================================================
@@ -287,11 +338,11 @@ def generate_association_rules(min_support=0.01, min_confidence=0.3, min_lift=1.
     # FP-Growth
     frequent_itemsets = fpgrowth(df_trans, min_support=min_support, use_colnames=True)
     if frequent_itemsets.empty:
-        return {"error": "No frequent itemsets found. Lower min_support."}
+        return {"method": "FP-Growth on TF-IDF Keywords", "transaction_count": len(transactions), "frequent_itemsets_found": 0, "rules": [], "interpretation": "No frequent itemsets found."}
         
     rules_df = association_rules(frequent_itemsets, metric="confidence", min_threshold=min_confidence)
     if rules_df.empty:
-        return {"error": "No rules found. Lower min_confidence."}
+        return {"method": "FP-Growth on TF-IDF Keywords", "transaction_count": len(transactions), "frequent_itemsets_found": len(frequent_itemsets), "rules": [], "interpretation": "No rules found above confidence threshold."}
         
     rules_df = rules_df[rules_df['lift'] >= min_lift]
     rules_df = rules_df.sort_values(by='lift', ascending=False).head(50)
@@ -419,7 +470,7 @@ def analyze_keyword_prominence(top_n=50):
         mask = (df['category'] == cat)
         if mask.sum() == 0: continue
         
-        cat_X = X[mask]
+        cat_X = X[mask.values]
         cat_mean = np.asarray(cat_X.mean(axis=0)).flatten()
         cat_top_idx = cat_mean.argsort()[-20:][::-1]
         

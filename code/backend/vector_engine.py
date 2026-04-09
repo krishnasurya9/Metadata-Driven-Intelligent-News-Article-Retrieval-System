@@ -4,11 +4,15 @@ Handles vector embeddings and similarity search
 """
 
 import os
+import logging
 import numpy as np
 import pickle
 import faiss
 from typing import List, Dict, Any, Tuple, Optional
 from sentence_transformers import SentenceTransformer
+
+# Suppress harmless HuggingFace buffer mismatch warnings (e.g. embeddings.position_ids UNEXPECTED)
+logging.getLogger("transformers.modeling_utils").setLevel(logging.ERROR)
 
 # Global model and index
 _model: Optional[SentenceTransformer] = None

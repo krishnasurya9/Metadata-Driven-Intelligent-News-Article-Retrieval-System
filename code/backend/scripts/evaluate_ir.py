@@ -21,7 +21,7 @@ except ImportError as e:
     print(f"Import Error: {e}")
     sys.exit(1)
 
-PLOT_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'eval', 'pr_curve.png')
+PLOT_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'eval', 'pr_curve.png')
 
 def calculate_average_precision(retrieved_docs, relevant_docs):
     """Calculate Average Precision (AP) for a single query"""

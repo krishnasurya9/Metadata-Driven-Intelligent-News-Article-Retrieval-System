@@ -16,7 +16,7 @@ def generate_data() -> tuple:
     Ground truth: manually crafted queries matching known article content
     """
     base_dir = os.path.dirname(__file__)
-    eval_dir = os.path.abspath(os.path.join(base_dir, '..', 'data', 'eval'))
+    eval_dir = os.path.abspath(os.path.join(base_dir, '..', '..', 'data', 'eval'))
     os.makedirs(eval_dir, exist_ok=True)
     
     csv_path = os.path.join(eval_dir, 'synthetic_corpus.csv')

@@ -9,7 +9,7 @@ import json
 import os
 import random
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'eval')
+DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'eval')
 os.makedirs(DATA_DIR, exist_ok=True)
 
 def generate_data():

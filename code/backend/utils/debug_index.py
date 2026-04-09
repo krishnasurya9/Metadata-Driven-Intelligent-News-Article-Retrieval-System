@@ -5,8 +5,9 @@ import os
 import sys
 
 # Paths
-DB_PATH = os.path.join('..', 'data', 'news_corpus.duckdb')
-INDEX_PATH = os.path.join('..', 'data', 'tfidf_index.pkl')
+base_dir = os.path.dirname(__file__)
+DB_PATH = os.path.join(base_dir, '..', '..', 'data', 'news_corpus.duckdb')
+INDEX_PATH = os.path.join(base_dir, '..', '..', 'data', 'tfidf_index.pkl')
 
 print(f"Checking Database at {DB_PATH}...")
 try:

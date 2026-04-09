@@ -13,33 +13,64 @@ DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'news_corpus.duc
 def get_connection():
     """Get a DuckDB connection"""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    return duckdb.connect(DB_PATH)
+    print(f"Attempting to connect to DuckDB at: {DB_PATH}")
+    try:
+        conn = duckdb.connect(DB_PATH)
+        print("Successfully connected to DuckDB.")
+        return conn
+    except Exception as e:
+        print(f"Error connecting to DuckDB: {e}")
+        raise
 
+def get_db_status() -> Dict[str, Any]:
+    """Check database status"""
+    try:
+        conn = get_connection()
+        count = conn.execute("SELECT COUNT(*) FROM news_articles").fetchone()[0]
+        conn.close()
+        return {
+            "status": "online",
+            "message": "Connected to DuckDB successfully.",
+            "document_count": count
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 def init_database():
     """Initialize the database with the news_articles table"""
+    print("Initializing database...")
     conn = get_connection()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS news_articles (
-            doc_id INTEGER PRIMARY KEY,
-            title TEXT,
-            content TEXT,
-            category TEXT,
-            tags TEXT,
-            source TEXT,
-            published_at DATE,
-            word_count INTEGER,
-            url TEXT
-        )
-    """)
-    
-    # Migration: Add url column if it doesn't exist
     try:
-        conn.execute("ALTER TABLE news_articles ADD COLUMN url TEXT")
-    except:
-        pass  # Column likely exists
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS news_articles (
+                doc_id INTEGER PRIMARY KEY,
+                title TEXT,
+                content TEXT,
+                category TEXT,
+                tags TEXT,
+                source TEXT,
+                published_at DATE,
+                word_count INTEGER,
+                url TEXT
+            )
+        """)
+        print("Table 'news_articles' checked/created.")
         
-    conn.close()
+        # Migration: Add url column if it doesn't exist
+        try:
+            conn.execute("ALTER TABLE news_articles ADD COLUMN url TEXT")
+            print("URL column checked/added.")
+        except duckdb.CatalogException:
+            print("URL column already exists.")
+        except Exception as e:
+            print(f"Error altering table for URL column: {e}")
+            
+    finally:
+        conn.close()
+        print("Database initialization complete.")
     return {"status": "success", "message": "Database initialized"}
 
 
@@ -276,13 +307,32 @@ def load_articles_from_csv(file_path: str, mode: str = 'replace') -> Dict[str, A
         return {"status": "error", "message": str(e)}
 
 
+def execute_query(query: str, params: tuple = None) -> List[Dict]:
+    """Execute a custom query and return results as a list of dicts"""
+    conn = get_connection()
+    if params:
+        result = conn.execute(query, params)
+    else:
+        result = conn.execute(query)
+        
+    try:
+        columns = [desc[0] for desc in result.description]
+        rows = result.fetchall()
+        conn.close()
+        return [dict(zip(columns, row)) for row in rows]
+    except Exception as e:
+        conn.close()
+        raise e
+
+
 def get_all_articles() -> List[Dict]:
     """Get all articles from the database"""
     conn = get_connection()
-    result = conn.execute("SELECT * FROM news_articles").fetchall()
-    columns = ['doc_id', 'title', 'content', 'category', 'tags', 'source', 'published_at', 'word_count']
+    result = conn.execute("SELECT * FROM news_articles")
+    columns = [desc[0] for desc in result.description]
+    rows = result.fetchall()
     conn.close()
-    return [dict(zip(columns, row)) for row in result]
+    return [dict(zip(columns, row)) for row in rows]
 
 
 def get_article_by_id(doc_id: int) -> Optional[Dict]:
@@ -291,7 +341,7 @@ def get_article_by_id(doc_id: int) -> Optional[Dict]:
     result = conn.execute("SELECT * FROM news_articles WHERE doc_id = ?", [doc_id]).fetchone()
     conn.close()
     if result:
-        columns = ['doc_id', 'title', 'content', 'category', 'tags', 'source', 'published_at', 'word_count']
+        columns = [desc[0] for desc in result.description]
         return dict(zip(columns, result))
     return None
 
@@ -316,10 +366,11 @@ def get_articles_by_filter(category: str = None, source: str = None,
         query += " AND published_at <= ?"
         params.append(date_to)
     
-    result = conn.execute(query, params).fetchall()
-    columns = ['doc_id', 'title', 'content', 'category', 'tags', 'source', 'published_at', 'word_count']
+    result = conn.execute(query, params)
+    columns = [desc[0] for desc in result.description]
+    rows = result.fetchall()
     conn.close()
-    return [dict(zip(columns, row)) for row in result]
+    return [dict(zip(columns, row)) for row in rows]
 
 
 def get_category_distribution() -> Dict[str, int]:

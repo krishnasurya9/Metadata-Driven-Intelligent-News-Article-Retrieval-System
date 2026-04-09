@@ -3,7 +3,7 @@ import os
 import time
 
 # Ensure backend dir is in path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
     import database

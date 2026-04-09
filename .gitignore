@@ -1,4 +1,4 @@
-# Virtual Environments
+﻿# Virtual Environments
 venv/
 .env
 __pycache__/
@@ -20,3 +20,9 @@ code/cdm_data/
 .vscode/
 .idea/
 .DS_Store
+
+# Root Datasets
+
+data/
+
+cdm_data/

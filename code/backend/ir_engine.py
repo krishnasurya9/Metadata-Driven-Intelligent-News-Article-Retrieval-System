@@ -10,10 +10,12 @@ import pickle
 import os
 import time
 import json
-from datetime import datetime
+import datetime
+from datetime import datetime as dt
 
 from preprocessor import preprocess_text
 import vector_engine
+import database
 
 # Global index and data
 _bm25: Optional[BM25Okapi] = None
@@ -40,23 +42,28 @@ def log_index_update(message: str):
 def check_index_exists() -> bool:
     """Check if ALL indices exist"""
     bm25_exists = os.path.exists(INDEX_PATH) and os.path.getsize(INDEX_PATH) > 0
-    vector_status = vector_engine.get_status()
-    # If vector engine says 'ready', it might be loaded, or we check path existence via its own logic if we want, 
-    # but here we rely on load_index to confirm.
-    # Actually, we should check if vector index file exists.
     vector_exists = os.path.exists(vector_engine.INDEX_PATH)
     
     return bm25_exists and vector_exists
 
+def check_and_build_index():
+    """
+    Checks if the index needs to be built and builds it if necessary.
+    Otherwise, loads the existing index.
+    """
+    documents = database.get_all_articles()
+    
+    if not check_index_exists() or _index_needs_update(documents):
+        print("Index is outdated or does not exist. Building new index...")
+        build_index(documents)
+    else:
+        print("Index is up to date. Loading from disk...")
+        load_index()
 
-def check_index_needs_update(documents: List[Dict]) -> bool:
+def _index_needs_update(documents: List[Dict]) -> bool:
     """
-    Smart Indexing Check
-    Returns True if index needs to be rebuilt, False otherwise.
+    Internal helper to check if the index needs to be rebuilt.
     """
-    if not check_index_exists():
-        return True
-        
     if not os.path.exists(INDEX_META_PATH):
         return True
         
@@ -67,19 +74,15 @@ def check_index_needs_update(documents: List[Dict]) -> bool:
         indexed_count = meta.get('doc_count', 0)
         current_count = len(documents)
         
-        # Simple check: If counts mismatch, rebuild.
-        # Future: Check timestamps or hashes if needed.
         if indexed_count != current_count:
-            print(f"Index mismatch: Indexed={indexed_count}, Current={current_count}. Rebuilding...")
+            print(f"Index mismatch: Indexed={indexed_count}, Current={current_count}. Rebuilding required.")
             return True
             
-        print(f"Smart Indexing: Index is up to date ({indexed_count} docs). Skipping build.")
         return False
         
     except Exception as e:
-        print(f"Error checking index metadata: {e}")
+        print(f"Error checking index metadata: {e}. Assuming rebuild is needed.")
         return True
-
 
 def build_index(documents: List[Dict]) -> Dict[str, Any]:
     """
@@ -144,6 +147,62 @@ def build_index(documents: List[Dict]) -> Dict[str, Any]:
         "documents_indexed": len(_doc_ids),
         "algorithm": "Hybrid (BM25 + FAISS)",
         "time_taken": f"{duration:.2f}s",
+        "vector_status": vector_result
+    }
+
+def update_index(all_documents: List[Dict], new_documents: List[Dict]) -> Dict[str, Any]:
+    """Incremental update for Hybrid Index handling new documents only for vector encoding"""
+    global _bm25, _doc_ids, _doc_map
+    
+    if not new_documents:
+        return {"status": "success"}
+        
+    if not load_index():
+        return build_index(all_documents)
+        
+    start_time = time.time()
+    log_index_update(f"Starting incremental update for {len(new_documents)} new documents...")
+    
+    # 1. Update Vector Index Incrementally (Solves 1-hour rebuild problem)
+    vector_result = vector_engine.update_index(new_documents)
+    
+    # 2. Rebuild BM25 for all (Fast enough for 120k articles, typically < 30s)
+    print("Rebuilding BM25 index with updated corpus...")
+    tokenized_corpus = []
+    _doc_ids = []
+    _doc_map = {}
+    
+    for idx, doc in enumerate(all_documents):
+        title = doc.get('title', '') or ''
+        content = doc.get('content', '') or ''
+        text = f"{title} {title} {content}"
+        
+        processed = preprocess_text(text)
+        tokenized_corpus.append(processed.split())
+        _doc_ids.append(doc['doc_id'])
+        _doc_map[doc['doc_id']] = idx
+        
+    _bm25 = BM25Okapi(tokenized_corpus)
+    
+    with open(INDEX_PATH, 'wb') as f:
+        pickle.dump({
+            'bm25': _bm25,
+            'doc_ids': _doc_ids,
+            'doc_map': _doc_map
+        }, f)
+        
+    with open(INDEX_META_PATH, 'w') as f:
+        json.dump({
+            'doc_count': len(all_documents),
+            'last_built': time.time(),
+            'version': '1.0'
+        }, f)
+        
+    duration = time.time() - start_time
+    log_index_update(f"Incremental update completed in {duration:.2f}s.")
+    return {
+        "status": "success", 
+        "documents_added": len(new_documents),
         "vector_status": vector_result
     }
 
@@ -249,17 +308,20 @@ def search(query: str, documents: List[Dict], filters: Dict = None,
         if pub_at:
             try:
                 if isinstance(pub_at, str):
-                    pub_date = datetime.fromisoformat(pub_at.replace('Z', '+00:00')).replace(tzinfo=None)
+                    pub_date = dt.fromisoformat(pub_at.replace('Z', '+00:00')).replace(tzinfo=None)
+                elif isinstance(pub_at, datetime.date) and not isinstance(pub_at, datetime.datetime):
+                    pub_date = dt.combine(pub_at, dt.min.time())
                 else:
                     pub_date = pub_at
-                days_old = (datetime.now() - pub_date).days
+                days_old = (dt.now() - pub_date).days
                 if days_old <= 30:
                     recency_score = 1.0
                 elif days_old <= 90:
                     recency_score = 0.7
                 elif days_old <= 365:
                     recency_score = 0.4
-            except:
+            except Exception as e:
+                print(f"Error calculating recency for {doc_id}: {e}")
                 pass
 
         category_score = 1.0 if doc.get('category') == target_category else 0.0
@@ -288,12 +350,15 @@ def search(query: str, documents: List[Dict], filters: Dict = None,
     
     bottom = final_results[-10:] if len(final_results) >= 10 else final_results
     
+    metrics = calculate_metrics(final_results, k=top_k)
+    
     return {
         "status": "success",
         "query": query,
         "total_results": len(final_results),
         "top_results": final_results[:top_k],
-        "bottom_results": bottom
+        "bottom_results": bottom,
+        "metrics": metrics
     }
 
 def calculate_metrics(results: List[Dict], k: int = 10) -> Dict[str, float]:

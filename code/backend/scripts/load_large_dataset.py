@@ -17,7 +17,7 @@ def main():
     print("   LARGE DATASET INGESTER & INDEXER (120k frozen_corpus)")
     print("="*60)
     
-    file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'cdm_data', 'frozen_corpus.csv'))
+    file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'cdm_data', 'frozen_corpus.csv'))
     
     if not os.path.exists(file_path):
         print(f"[!] Error: Could not find frozen_corpus.csv at {file_path}")
