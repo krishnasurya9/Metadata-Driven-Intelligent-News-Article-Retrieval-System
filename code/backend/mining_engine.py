@@ -35,10 +35,14 @@ except ImportError:
 MODELS_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'models')
 os.makedirs(MODELS_DIR, exist_ok=True)
 
+from cdm_analytics.preprocessing import load_frozen_data
+
 def _get_data_for_mining():
-    """Fetch data from DB and convert to DataFrame"""
-    articles = database.get_all_articles()
-    df = pd.DataFrame(articles)
+    """
+    Fetch data directly from the Frozen Corpus (v2) to ensure CDM 
+    is completely decoupled from the IRT live database.
+    """
+    df = load_frozen_data()
     return df
 
 # =========================================================================

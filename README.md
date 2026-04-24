@@ -15,10 +15,13 @@ This repository houses a comprehensive, offline-first AI pipeline that ingests d
 *   **Explainable RAG:** Uses local Language Models (via LM Studio on Port 1234) as post-retrieval synthesizers to explain *why* specific documents ranked highly.
 
 ### ⛏️ Data Mining (CDM) Objective: *Automated Pattern Discovery System*
-The "Mining Lab" utilizes a 120,000-document *Frozen Corpus* (AG News) to ensure replicable academic benchmarks, implementing 5 advanced algorithms:
-*   **Embedded Warehousing:** Operates a local DuckDB data warehouse to unify raw CSVs and live API streams seamlessly.
+The "Mining Lab" is purposefully decoupled from the IRT DuckDB and runs entirely on a dynamic *Frozen Corpus* toggle. Evaluators can seamlessly switch between:
+1.  **Baseline Test (v1):** The standard 120,000-document AG News Corpus (4 categories).
+2.  **Main Production Benchmark (v2):** The massive HuffPost News Category Dataset (210,000 documents, 42 distinct categories).
+
+By keeping CDM physically isolated from the live IRT pipeline, the system safely executes 5 advanced algorithms on extreme data scales:
 *   **Bisecting K-Means + LSA Clustering:** Utilizes TruncatedSVD for dimensional reduction on high-dimensional TF-IDF vectors, featuring an autonomous Elbow Curve generation endpoint for optimal `K` discovery.
-*   **Classification Benchmarking:** A Dual-Model pipeline evaluating **Naive Bayes** vs. **Linear SVM** via real-time training, emitting complete classification matrices and interactive confusion grids.
+*   **Classification Benchmarking:** A Dual-Model pipeline evaluating **Naive Bayes** vs. **Linear SVM** via real-time training on both datasets.
 *   **FP-Growth Association Rules:** Eliminates sparse tag limitations by mining association rules strictly from the top TF-IDF unigrams/bigrams per document.
 *   **Advanced Analytics:** Introduces **Temporal Pattern Mining** (Time-Series linear regression) and **Keyword Prominence Analysis** (Global vs. Category-defining vocabulary mapping).
 

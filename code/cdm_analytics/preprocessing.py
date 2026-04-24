@@ -2,9 +2,18 @@ import pandas as pd
 import os
 import re
 
-FROZEN_CORPUS_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), '..', '..', 'cdm_data', 'frozen_corpus.csv')
-)
+# =========================================================
+# DATASET TOGGLE: Switch between the datasets for your review
+# Set this to "HUFFPOST" for the 42-category dataset
+# Set this to "AG_NEWS" for the original 4-category dataset
+# =========================================================
+ACTIVE_DATASET = "HUFFPOST" 
+
+BASE_DIR = os.path.dirname(__file__)
+AG_NEWS_PATH = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'cdm_data', 'frozen_corpus.csv'))
+HUFFPOST_PATH = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'cdm_data', 'huffpost_corpus.json'))
+
+FROZEN_CORPUS_PATH = HUFFPOST_PATH if ACTIVE_DATASET == "HUFFPOST" else AG_NEWS_PATH
 
 def get_frozen_corpus_path() -> str:
     """Return the canonical CDM frozen corpus path."""
@@ -41,7 +50,17 @@ def load_frozen_data() -> pd.DataFrame:
         return pd.DataFrame()
         
     try:
-        df = pd.read_csv(path, encoding='utf-8')
+        if path.endswith('.json'):
+            df = pd.read_json(path, lines=True)
+            # HuffPost specific mapping
+            if 'headline' in df.columns:
+                df.rename(columns={'headline': 'title'}, inplace=True)
+            if 'short_description' in df.columns:
+                df.rename(columns={'short_description': 'content'}, inplace=True)
+            if 'date' in df.columns:
+                df.rename(columns={'date': 'published_at'}, inplace=True)
+        else:
+            df = pd.read_csv(path, encoding='utf-8')
     except UnicodeDecodeError:
         df = pd.read_csv(path, encoding='ISO-8859-1')
         
@@ -80,9 +99,13 @@ def load_frozen_data() -> pd.DataFrame:
             else:
                 df[col] = "Unknown"
                 
-    # Validate 4 categories
-    valid_categories = ['World', 'Sports', 'Business', 'Technology']
-    df['category'] = df['category'].apply(lambda c: c if c in valid_categories else 'Unknown')
+    # Validate categories depending on dataset
+    if ACTIVE_DATASET == "AG_NEWS":
+        valid_categories = ['World', 'Sports', 'Business', 'Technology']
+        df['category'] = df['category'].apply(lambda c: c if c in valid_categories else 'Unknown')
+    else:
+        # HuffPost has 42 categories, we will use them as is.
+        df['category'] = df['category'].fillna('Unknown')
     
     return df[['doc_id', 'title', 'content', 'category', 'source', 'published_at', 'combined_text', 'text_length']]
 

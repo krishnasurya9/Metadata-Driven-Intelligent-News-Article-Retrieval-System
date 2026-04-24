@@ -150,11 +150,18 @@ def load_articles_from_csv(file_path: str, mode: str = 'replace') -> Dict[str, A
         return {"status": "error", "message": f"File not found: {file_path}"}
     
     try:
-        # Read CSV with automatic encoding detection
-        try:
-            df = pd.read_csv(file_path, low_memory=False)
-        except UnicodeDecodeError:
-            df = pd.read_csv(file_path, encoding='latin-1', low_memory=False)
+        if file_path.endswith('.json'):
+            df = pd.read_json(file_path, lines=True)
+            # Pre-map HuffPost JSON columns to make auto-schema mapping easier
+            if 'headline' in df.columns: df.rename(columns={'headline': 'title'}, inplace=True)
+            if 'short_description' in df.columns: df.rename(columns={'short_description': 'content'}, inplace=True)
+            if 'date' in df.columns: df.rename(columns={'date': 'published_at'}, inplace=True)
+        else:
+            # Read CSV with automatic encoding detection
+            try:
+                df = pd.read_csv(file_path, low_memory=False)
+            except UnicodeDecodeError:
+                df = pd.read_csv(file_path, encoding='latin-1', low_memory=False)
         
         original_cols = list(df.columns)
         original_rows = len(df)

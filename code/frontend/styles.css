@@ -1659,3 +1659,158 @@ body {
     scroll-behavior: smooth;
     overflow-y: auto;
 }
+
+/* ============================================================
+   CDM PROFESSIONAL UI REFINEMENTS
+   Cleaner, less flashy, presentation-ready visuals
+   ============================================================ */
+
+.mining-view {
+    background: #f3f2ee;
+}
+
+.mining-sidebar {
+    width: 270px;
+    min-width: 270px;
+    background: #fcfcfb;
+}
+
+.mining-brand {
+    padding: 18px 20px;
+}
+
+.mining-brand-icon {
+    font-size: 18px;
+}
+
+.mining-brand-title {
+    font-size: 14px;
+    letter-spacing: -0.01em;
+}
+
+.mining-brand-sub {
+    font-size: 11px;
+}
+
+.mining-sidebar-nav {
+    padding: 14px 12px;
+}
+
+.mining-nav-item {
+    border: 1px solid transparent;
+    margin-bottom: 6px;
+}
+
+.mining-nav-item.active {
+    border-left: 3px solid var(--accent);
+    border-color: rgba(99, 102, 241, 0.2);
+    background: rgba(99, 102, 241, 0.08);
+}
+
+.mining-nav-label {
+    font-size: 13px;
+}
+
+.mining-nav-sub {
+    font-size: 11px;
+}
+
+.mining-topbar {
+    padding: 14px 22px;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.mining-breadcrumb {
+    font-size: 15px;
+}
+
+.mining-topbar-right {
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.mining-course-tag {
+    font-size: 10px;
+}
+
+.mining-panel {
+    padding: 24px;
+}
+
+.panel-header {
+    margin-bottom: 18px;
+}
+
+.panel-title {
+    font-size: 22px;
+    letter-spacing: -0.02em;
+}
+
+.panel-desc {
+    font-size: 14px;
+    color: #4f5662;
+    max-width: 700px;
+}
+
+.panel-results {
+    background: #ffffff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: 1px solid #dfddd5;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
+.warehouse-source-card,
+.cluster-card,
+.classifier-card,
+.rule-card,
+.result-card-standard,
+.confusion-matrix-wrap {
+    box-shadow: none;
+    border-color: #dfddd5;
+}
+
+.warehouse-source-card:hover,
+.cluster-card:hover,
+.classifier-card:hover,
+.rule-card:hover {
+    transform: none;
+    box-shadow: 0 4px 12px rgba(16, 24, 40, 0.08);
+}
+
+.run-btn {
+    border-radius: 10px;
+    box-shadow: none;
+}
+
+.run-btn:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.placeholder-box {
+    font-size: 13px;
+    color: #667085;
+    background: #f8f8f6;
+    border: 1px dashed #ddd9cf;
+    border-radius: 12px;
+}
+
+.analytics-stat-card,
+.result-item,
+.mining-panel.active-panel,
+.stagger-item {
+    animation: none !important;
+}
+
+@media (max-width: 1100px) {
+    .mining-sidebar {
+        width: 244px;
+        min-width: 244px;
+    }
+
+    .panel-title {
+        font-size: 20px;
+    }
+}
