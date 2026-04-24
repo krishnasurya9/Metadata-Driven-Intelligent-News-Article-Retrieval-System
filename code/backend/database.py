@@ -68,6 +68,15 @@ def init_database():
         except Exception as e:
             print(f"Error altering table for URL column: {e}")
             
+        # Migration: Add image column if it doesn't exist
+        try:
+            conn.execute("ALTER TABLE news_articles ADD COLUMN image TEXT")
+            print("Image column checked/added.")
+        except duckdb.CatalogException:
+            pass
+        except Exception as e:
+            print(f"Error altering table for image column: {e}")
+            
     finally:
         conn.close()
         print("Database initialization complete.")
@@ -109,12 +118,13 @@ def save_articles(articles: List[Dict]) -> int:
         source = art.get('source') or 'Unknown'
         published_at = art.get('published_at')
         word_count = len(content.split()) if content else 0
+        image = art.get('image')
         
         conn.execute("""
             INSERT INTO news_articles 
-            (doc_id, title, content, category, tags, source, published_at, word_count, url)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (next_id, title, content, category, 'live-news', source, published_at, word_count, url))
+            (doc_id, title, content, category, tags, source, published_at, word_count, url, image)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (next_id, title, content, category, 'live-news', source, published_at, word_count, url, image))
         
         next_id += 1
         new_count += 1
@@ -258,11 +268,14 @@ def load_articles_from_csv(file_path: str, mode: str = 'replace') -> Dict[str, A
         df['source'] = df['source'].fillna(file_basename)
         df['tags'] = df['tags'].fillna('')
         df['url'] = df['url'].fillna('')
+        if 'image' not in df.columns:
+            df['image'] = None
+        df['image'] = df['image'].fillna('')
         df['word_count'] = df['word_count'].fillna(0).astype(int)
         
         # Select only schema columns
         schema_cols = ['doc_id', 'title', 'content', 'category', 'tags', 
-                       'source', 'published_at', 'word_count', 'url']
+                       'source', 'published_at', 'word_count', 'url', 'image']
         for col in schema_cols:
             if col not in df.columns:
                 df[col] = None

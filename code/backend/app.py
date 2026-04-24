@@ -31,10 +31,27 @@ CORS(app)
 
 last_metrics = {"precision": 0.0, "recall": 0.0, "f1": 0.0, "map": 0.0, "average_score": 0.0}
 
+def _cdm_frozen_guard_error():
+    """Return a consistent error payload when frozen CDM data is unavailable."""
+    status = cdm_prep.get_frozen_corpus_status()
+    return jsonify({
+        "status": "error",
+        "message": "CDM frozen corpus is required and was not found.",
+        "data_source": status
+    }), 500
+
+def _assert_cdm_frozen_corpus():
+    """Hard guard: CDM endpoints must use frozen corpus only."""
+    status = cdm_prep.get_frozen_corpus_status()
+    print(f"[CDM] Data source locked -> {status['source']} @ {status['path']} (exists={status['exists']})")
+    return status["exists"]
+
 # Decorator to run mining_engine on frozen corpus
 def with_frozen_corpus(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
+        if not _assert_cdm_frozen_corpus():
+            return _cdm_frozen_guard_error()
         original = mining_engine._get_data_for_mining
         mining_engine._get_data_for_mining = cdm_prep.load_frozen_data
         try:
@@ -102,6 +119,42 @@ def debug_dump():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/api/analytics', methods=['POST'])
+def run_analytics():
+    """
+    Analytics dispatcher used by frontend analytics-mode.js.
+    Accepts payload:
+      {
+        "type": "category_distribution" | "term_frequency" | "source_bias" | "time_trends",
+        "doc_ids": [optional list],
+        "top_n": 30
+      }
+    """
+    try:
+        data = request.json or {}
+        analysis_type = (data.get('type') or 'category_distribution').strip().lower()
+        doc_ids = data.get('doc_ids')
+        top_n = int(data.get('top_n', 30))
+        documents = database.get_all_articles()
+
+        if analysis_type == 'category_distribution':
+            result = analytics_engine.analyze_category_distribution(documents, doc_ids=doc_ids)
+        elif analysis_type == 'term_frequency':
+            result = analytics_engine.analyze_term_frequency(documents, doc_ids=doc_ids, top_n=top_n)
+        elif analysis_type == 'source_bias':
+            result = analytics_engine.analyze_source_bias(documents, doc_ids=doc_ids)
+        elif analysis_type == 'time_trends':
+            result = analytics_engine.analyze_time_trends(documents, doc_ids=doc_ids)
+        else:
+            return jsonify({
+                "status": "error",
+                "message": f"Unsupported analytics type: {analysis_type}"
+            }), 400
+
+        return jsonify({"status": "success", "data": result.get("data", result)})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 # ==========================================
 # DATA ROUTES
 # ==========================================
@@ -112,10 +165,14 @@ def load_data():
         path = data.get('path', 'news_articles.csv')
         mode = data.get('mode', 'append')
         base_dir = os.path.dirname(__file__)
-        full_path = os.path.abspath(os.path.join(base_dir, '..', 'data', path))
+        full_path = os.path.abspath(os.path.join(base_dir, '..', '..', 'data', path))
         
         if not os.path.exists(full_path):
-             return jsonify({"status": "error", "message": f"File not found: {full_path}"}), 404
+            # Fallback to cdm_data
+            full_path = os.path.abspath(os.path.join(base_dir, '..', '..', 'cdm_data', path))
+        
+        if not os.path.exists(full_path):
+             return jsonify({"status": "error", "message": f"File not found: {path} in data/ or cdm_data/"}), 404
              
         # Before load, track count
         count_before = database.get_corpus_stats().get('total_articles', 0)
@@ -127,7 +184,7 @@ def load_data():
         if count_after > 0:
             if mode == 'append' and count_before > 0 and new_docs_count > 0:
                 print(f"Triggering incremental update for {new_docs_count} documents...")
-                new_docs = database.execute_query(f"SELECT * FROM news_articles ORDER BY rowid DESC LIMIT {new_docs_count}")
+                new_docs = database.execute_query(f"SELECT * FROM news_articles ORDER BY doc_id DESC LIMIT {new_docs_count}")
                 threading.Thread(target=ir_engine.update_index, args=(database.get_all_articles(), new_docs)).start()
             else:
                 threading.Thread(target=ir_engine.build_index, args=(database.get_all_articles(),)).start()
@@ -157,7 +214,7 @@ def upload_data():
         new_docs_count = count_after - count_before
         
         if mode == 'append' and count_before > 0 and new_docs_count > 0:
-            new_docs = database.execute_query(f"SELECT * FROM news_articles ORDER BY rowid DESC LIMIT {new_docs_count}")
+            new_docs = database.execute_query(f"SELECT * FROM news_articles ORDER BY doc_id DESC LIMIT {new_docs_count}")
             threading.Thread(target=ir_engine.update_index, args=(database.get_all_articles(), new_docs)).start()
         else:
             threading.Thread(target=ir_engine.build_index, args=(database.get_all_articles(),)).start()
@@ -170,6 +227,7 @@ def upload_data():
 def data_info():
     try:
         stats = database.get_corpus_stats()
+        documents = database.get_all_articles()
         # Mocking file list for now
         files = ["news_articles.csv", "frozen_corpus.csv"]
         return jsonify({
@@ -177,7 +235,7 @@ def data_info():
             "data": {
                 "files": files,
                 "storage": stats,
-                "category_distribution": analytics_engine.analyze_category_distribution().get('data', {})
+                "category_distribution": analytics_engine.analyze_category_distribution(documents).get('data', {})
             }
         })
     except Exception as e:
@@ -201,8 +259,8 @@ def get_fetch_status():
 @app.route('/api/live-news', methods=['GET'])
 def get_live_news():
     try:
-        top_news = database.execute_query("SELECT * FROM news_articles ORDER BY published_at DESC LIMIT 50")
-        return jsonify({"status": "success", "data": top_news})
+        top_news = database.execute_query("SELECT * FROM news_articles ORDER BY doc_id DESC LIMIT 50")
+        return jsonify({"status": "success", "data": top_news, "articles": top_news})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -304,6 +362,8 @@ def llm_status():
 @app.route('/api/cdm/stats', methods=['GET'])
 def cdm_stats():
     try:
+        if not _assert_cdm_frozen_corpus():
+            return _cdm_frozen_guard_error()
         df = cdm_prep.load_frozen_data()
         res = cdm_prep.get_preprocessing_stats(df)
         return jsonify({"status": "success", "data": res}) if "error" not in res else jsonify({"status": "error", "message": res["error"]}), 500 if "error" in res else 200
@@ -313,6 +373,8 @@ def cdm_stats():
 @app.route('/api/cdm/cluster', methods=['POST'])
 def cdm_cluster():
     try:
+        if not _assert_cdm_frozen_corpus():
+            return _cdm_frozen_guard_error()
         data = request.json or {}
         res = cdm_clust.run_clustering(int(data.get('n_clusters', 4)))
         return jsonify({"status": "success", "data": res}) if "error" not in res else jsonify({"status": "error", "message": res["error"]}), 500 if "error" in res else 200
@@ -322,6 +384,8 @@ def cdm_cluster():
 @app.route('/api/cdm/elbow', methods=['GET'])
 def cdm_elbow():
     try:
+        if not _assert_cdm_frozen_corpus():
+            return _cdm_frozen_guard_error()
         res = cdm_clust.get_elbow_data()
         return jsonify({"status": "success", "data": res}) if "error" not in res else jsonify({"status": "error", "message": res["error"]}), 500 if "error" in res else 200
     except Exception as e:
@@ -330,6 +394,8 @@ def cdm_elbow():
 @app.route('/api/cdm/classify', methods=['POST'])
 def cdm_classify():
     try:
+        if not _assert_cdm_frozen_corpus():
+            return _cdm_frozen_guard_error()
         res = cdm_class.run_classification()
         return jsonify({"status": "success", "data": res}) if "error" not in res else jsonify({"status": "error", "message": res["error"]}), 500 if "error" in res else 200
     except Exception as e:
@@ -338,6 +404,8 @@ def cdm_classify():
 @app.route('/api/cdm/predict', methods=['POST'])
 def cdm_predict():
     try:
+        if not _assert_cdm_frozen_corpus():
+            return _cdm_frozen_guard_error()
         data = request.json or {}
         res = cdm_class.predict_single(data.get('text', ''))
         return jsonify({"status": "success", "data": res}) if "error" not in res else jsonify({"status": "error", "message": res["error"]}), 500 if "error" in res else 200
@@ -396,5 +464,5 @@ def initialize_index():
 if __name__ == '__main__':
     database.init_database()
     initialize_index()
-    # news_fetcher.start_background_fetch() # Intentionally disabled at startup so it doesn't overwrite the FAISS index.
+    news_fetcher.start_background_fetch() # Enabled at startup to fetch live news
     app.run(host='0.0.0.0', port=5000, debug=False)

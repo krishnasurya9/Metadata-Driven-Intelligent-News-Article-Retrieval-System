@@ -329,11 +329,10 @@ def generate_association_rules(min_support=0.01, min_confidence=0.3, min_lift=1.
         trans = [terms[idx] for idx in top_indices if row[idx] > 0]
         transactions.append(trans)
         
-    # Convert to one-hot DataFrame for mlxtend
-    from mlxtend.preprocessing import TransactionEncoder
-    te = TransactionEncoder()
-    te_ary = te.fit(transactions).transform(transactions)
-    df_trans = pd.DataFrame(te_ary, columns=te.columns_)
+    # Convert to one-hot DataFrame without mlxtend.preprocessing
+    unique_items = sorted(list(set(item for trans in transactions for item in trans)))
+    records = [{item: (item in trans) for item in unique_items} for trans in transactions]
+    df_trans = pd.DataFrame(records)
     
     # FP-Growth
     frequent_itemsets = fpgrowth(df_trans, min_support=min_support, use_colnames=True)

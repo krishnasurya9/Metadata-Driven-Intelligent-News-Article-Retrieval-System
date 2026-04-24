@@ -623,6 +623,78 @@ a {
     display: flex !important; /* Override standard .hidden so opacity transition works */
     backdrop-filter: blur(0px);
 }
+
+/* ── Article Detail Modal ───────────────────────────────────── */
+.article-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.article-modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.article-modal-card {
+    position: relative;
+    width: min(800px, 95vw);
+    max-height: 85vh;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-xl);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: fadeUp 0.2s ease;
+}
+
+.article-modal-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    border: none;
+    background: transparent;
+    font-size: 24px;
+    color: var(--text-3);
+    cursor: pointer;
+    line-height: 1;
+}
+
+.article-modal-close:hover {
+    color: var(--text);
+}
+
+.article-modal-header {
+    padding: 20px 48px 12px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.article-modal-header h2 {
+    font-size: 20px;
+    line-height: 1.35;
+    margin-bottom: 8px;
+}
+
+.article-modal-meta {
+    font-size: 12px;
+    color: var(--text-2);
+}
+
+.article-modal-body {
+    padding: 16px 20px 20px;
+    overflow-y: auto;
+    color: var(--text-2);
+    font-size: 14px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+}
 .loading-overlay p {
     margin-top: 16px;
     font-size: 14px;
@@ -955,6 +1027,34 @@ a {
 }
 .mining-breadcrumb { font-size: 14px; font-weight: 700; color: var(--text); }
 .mining-course-tag { font-size: 11px; color: var(--text-3); letter-spacing: 0.02em; }
+.mining-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.cdm-status-badge {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: var(--r-full);
+    border: 1px solid var(--border);
+}
+.cdm-status-badge.idle { background: var(--bg-subtle); color: var(--text-2); }
+.cdm-status-badge.running { background: rgba(245, 158, 11, 0.1); color: #92400E; border-color: rgba(245, 158, 11, 0.25); }
+.cdm-status-badge.success { background: rgba(16, 185, 129, 0.1); color: #065F46; border-color: rgba(16, 185, 129, 0.25); }
+.cdm-status-badge.error { background: rgba(239, 68, 68, 0.1); color: #991B1B; border-color: rgba(239, 68, 68, 0.25); }
+
+.review-mode-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-2);
+}
+.review-mode-toggle input { accent-color: var(--accent); }
 
 .mining-panel {
     display: none;
@@ -1036,6 +1136,11 @@ a {
     font-family: inherit;
 }
 .param-input:focus { border-color: var(--border-focus); outline: none; }
+.param-hint {
+    font-size: 11px;
+    color: var(--text-3);
+    max-width: 320px;
+}
 
 /* Placeholder */
 .placeholder-box {
@@ -1043,6 +1148,27 @@ a {
     color: var(--text-3);
     font-size: 14px;
     padding: 48px 20px;
+}
+
+.result-card-standard {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 14px;
+    margin-bottom: 12px;
+}
+.result-card-standard h4 {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-3);
+    margin-bottom: 8px;
+}
+.result-card-standard p {
+    font-size: 13px;
+    color: var(--text-2);
+    line-height: 1.6;
 }
 
 /* Warehouse */
@@ -1287,6 +1413,18 @@ a {
 /* ── Mining nav tab styles ── */
 .mining-nav, .mining-tab-btn, .mining-controls,
 .clusters-grid { /* reset legacy */ }
+
+.review-mode .panel-header {
+    margin-bottom: 14px;
+}
+.review-mode .panel-desc,
+.review-mode .param-hint,
+.review-mode .mining-course-tag {
+    display: none;
+}
+.review-mode .panel-results {
+    padding: 16px;
+}
 /* =================================================================
    CDM UI ENHANCEMENTS - Glassmorphism, Confidence, Cards, Animations
    ================================================================= */

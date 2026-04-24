@@ -79,7 +79,15 @@ const elements = {
     metricPrecision: document.getElementById('metric-precision'),
     metricRecall: document.getElementById('metric-recall'),
     metricF1: document.getElementById('metric-f1'),
-    metricScore: document.getElementById('metric-score')
+    metricScore: document.getElementById('metric-score'),
+
+    // Article Modal
+    articleModal: document.getElementById('article-modal'),
+    articleModalOverlay: document.getElementById('article-modal-overlay'),
+    articleModalClose: document.getElementById('article-modal-close'),
+    articleModalTitle: document.getElementById('article-modal-title'),
+    articleModalMeta: document.getElementById('article-modal-meta'),
+    articleModalBody: document.getElementById('article-modal-body')
 };
 
 // Initialize
@@ -129,6 +137,15 @@ function initEventListeners() {
 
     elements.closeMetrics?.addEventListener('click', () => {
         elements.metricsSidebar.classList.remove('open');
+    });
+
+    // Article Modal
+    elements.articleModalClose?.addEventListener('click', closeArticleModal);
+    elements.articleModalOverlay?.addEventListener('click', closeArticleModal);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && elements.articleModal && !elements.articleModal.classList.contains('hidden')) {
+            closeArticleModal();
+        }
     });
 }
 
@@ -488,8 +505,36 @@ function goToPage(page) {
 function showArticleDetail(docId) {
     const article = state.allResults.find(r => r.doc_id === docId);
     if (article) {
-        alert(`Article: ${article.title}\n\n${article.content_excerpt}`);
+        openArticleModal(article);
     }
+}
+
+function openArticleModal(article) {
+    if (!elements.articleModal) return;
+    const source = article.metadata?.source || 'Unknown source';
+    const category = article.metadata?.category || 'Uncategorized';
+    const date = article.metadata?.published_at && article.metadata.published_at !== 'None'
+        ? article.metadata.published_at
+        : 'Unknown date';
+    const score = typeof article.score === 'number' ? article.score.toFixed(3) : '-';
+
+    if (elements.articleModalTitle) {
+        elements.articleModalTitle.textContent = article.title || 'Untitled Article';
+    }
+    if (elements.articleModalMeta) {
+        elements.articleModalMeta.textContent = `${source} | ${category} | ${date} | Score: ${score}`;
+    }
+    if (elements.articleModalBody) {
+        elements.articleModalBody.textContent = article.content_excerpt || 'No content available.';
+    }
+    elements.articleModal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeArticleModal() {
+    if (!elements.articleModal) return;
+    elements.articleModal.classList.add('hidden');
+    document.body.style.overflow = '';
 }
 
 // Analytics (placeholder)

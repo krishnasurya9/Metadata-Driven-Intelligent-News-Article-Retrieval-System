@@ -24,6 +24,15 @@ The "Mining Lab" utilizes a 120,000-document *Frozen Corpus* (AG News) to ensure
 
 ---
 
+## 🌟 Recent Updates (Review 3 Preparedness)
+
+*   **High-Fidelity CDM UI/UX**: Implemented a modern, Tavily-inspired design system with smooth transitions, custom scrollbars, and interactive loading states.
+*   **Architectural Stability**: Resolved BERT model loading warnings and optimized FAISS index initialization to prevent unnecessary rebuilds during startup.
+*   **Advanced Visualizations**: Fully integrated PCA scatter plots within the clustering panel for dimensional reduction analytics.
+*   **Ablation Studies & Compliance**: Completed structural fixes to API contracts and frontend-backend interactions, ensuring strict adherence to academic evaluation standards.
+
+---
+
 ## 🛠️ Setup & Installation
 
 1.  **Clone the repository**

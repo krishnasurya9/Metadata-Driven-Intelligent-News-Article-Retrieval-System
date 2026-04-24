@@ -124,7 +124,41 @@ const MiningLab = {
         document.getElementById('run-temporal')?.addEventListener('click', () => this.runTemporal());
         document.getElementById('run-keywords')?.addEventListener('click', () => this.runKeywords());
         document.getElementById('live-predict-btn')?.addEventListener('click', () => this.runLivePredict());
+        document.getElementById('review-mode-toggle')?.addEventListener('change', (e) => {
+            document.querySelector('.mining-view')?.classList.toggle('review-mode', !!e.target.checked);
+        });
         this.initWarehouse();
+    },
+
+    setRunStatus(state, text) {
+        const badge = document.getElementById('cdm-run-status');
+        if (!badge) return;
+        badge.className = `cdm-status-badge ${state}`;
+        badge.textContent = text;
+    },
+
+    renderStandardSections({ method, params, metrics, interpretation }) {
+        const metricRows = Object.entries(metrics || {}).map(([k, v]) =>
+            `<div class="rule-stat-chip">${k}: <strong>${v}</strong></div>`
+        ).join('');
+        return `
+            <div class="result-card-standard">
+                <h4>Method</h4>
+                <p>${method || 'N/A'}</p>
+            </div>
+            <div class="result-card-standard">
+                <h4>Input Params</h4>
+                <p>${params || 'Default params'}</p>
+            </div>
+            <div class="result-card-standard">
+                <h4>Key Metrics</h4>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;">${metricRows || '<span class="rule-stat-chip">No metrics</span>'}</div>
+            </div>
+            <div class="result-card-standard">
+                <h4>Interpretation</h4>
+                <p>${interpretation || 'No interpretation available.'}</p>
+            </div>
+        `;
     },
 
     // Warehouse
@@ -188,6 +222,7 @@ const MiningLab = {
     // Preprocessing
     async runPreprocessingDemo() {
         const el = document.getElementById('preprocessing-output');
+        this.setRunStatus('running', 'Running: Preprocessing');
         el.innerHTML = '<div class="placeholder-box">Loading...</div>';
         try {
             const r = await fetch('http://localhost:5000/api/cdm/stats');
@@ -200,8 +235,15 @@ const MiningLab = {
                     <div class="warehouse-stat-card"><span class="warehouse-stat-value">${d.avg_text_length||0}</span><span class="warehouse-stat-label">Avg Words</span></div>
                     <div class="warehouse-stat-card"><span class="warehouse-stat-value">${(d.vocabulary_size||0).toLocaleString()}</span><span class="warehouse-stat-label">Vocab Size</span></div>
                 </div>`;
-            } else { el.innerHTML = 'Error'; }
-        } catch(e) { el.innerHTML = e.message; }
+                this.setRunStatus('success', 'Success: Preprocessing');
+            } else {
+                this.setRunStatus('error', 'Failed: Preprocessing');
+                el.innerHTML = `<div class="placeholder-box">Failed to load preprocessing stats. Ensure frozen_corpus.csv exists.</div>`;
+            }
+        } catch(e) {
+            this.setRunStatus('error', 'Failed: Preprocessing');
+            el.innerHTML = `<div class="placeholder-box">Request failed: ${e.message}</div>`;
+        }
     },
 
     // Association Rules — visual cards
@@ -209,6 +251,7 @@ const MiningLab = {
         const container = document.getElementById('association-results');
         const minSupport = document.getElementById('min-support')?.value || 0.05;
         const minConfidence = document.getElementById('min-confidence')?.value || 0.2;
+        this.setRunStatus('running', 'Running: Association');
         container.innerHTML = '<div class="placeholder-box">Running FP-Growth... (~10s)</div>';
         try {
             const r = await fetch('http://localhost:5000/api/cdm/association', {
@@ -219,7 +262,8 @@ const MiningLab = {
             if (result.status === 'success') {
                 const data = result.data;
                 if (!data.rules || !data.rules.length) {
-                    container.innerHTML = '<div class="placeholder-box">No rules found. Try lower thresholds.</div>';
+                    this.setRunStatus('error', 'Failed: Association');
+                    container.innerHTML = '<div class="placeholder-box">No rules found. Try lower support/confidence values.</div>';
                     return;
                 }
                 const cards = data.rules.slice(0, 24).map((rule, i) => {
@@ -237,16 +281,28 @@ const MiningLab = {
                         </div>
                     </div>`;
                 }).join('');
-                container.innerHTML = `
-                    <p style="font-size:13px;color:var(--text-2);margin-bottom:16px;">${data.interpretation||''}</p>
-                    <div class="rule-cards-grid">${cards}</div>`;
-            } else { container.innerHTML = `<div class="placeholder-box">${result.message}</div>`; }
-        } catch(e) { container.innerHTML = `<div class="placeholder-box">Error: ${e.message}</div>`; }
+                const standard = this.renderStandardSections({
+                    method: data.method,
+                    params: `min_support=${minSupport}, min_confidence=${minConfidence}`,
+                    metrics: { rules: data.rules.length, itemsets: data.frequent_itemsets_found, transactions: data.transaction_count },
+                    interpretation: data.interpretation
+                });
+                container.innerHTML = `${standard}<div class="rule-cards-grid">${cards}</div>`;
+                this.setRunStatus('success', 'Success: Association');
+            } else {
+                this.setRunStatus('error', 'Failed: Association');
+                container.innerHTML = `<div class="placeholder-box">${result.message || 'Association call failed. Check frozen corpus and thresholds.'}</div>`;
+            }
+        } catch(e) {
+            this.setRunStatus('error', 'Failed: Association');
+            container.innerHTML = `<div class="placeholder-box">Error: ${e.message}</div>`;
+        }
     },
 
     // Classification — scorecards + confidence bars
     async runClassification() {
         const container = document.getElementById('classification-results');
+        this.setRunStatus('running', 'Running: Classification');
         container.innerHTML = '<div class="placeholder-box">Benchmarking NB vs SVM... (~30s)</div>';
         try {
             const r = await fetch('http://localhost:5000/api/cdm/classify', { method:'POST' });
@@ -299,7 +355,17 @@ const MiningLab = {
                     </div>`;
                 };
 
-                container.innerHTML = `
+                const standard = this.renderStandardSections({
+                    method: 'Dual Classifier Benchmark (Naive Bayes vs Linear SVM)',
+                    params: 'test_size=0.2, vectorizer=TF-IDF(1,2), max_features=10000',
+                    metrics: {
+                        winner: d.winner,
+                        accuracy_delta: (d.accuracy_delta * 100).toFixed(2) + '%',
+                        dataset_size: d.dataset_size
+                    },
+                    interpretation: d.recommendation
+                });
+                container.innerHTML = `${standard}
                     <div class="winner-banner">
                         <span>🏆</span>
                         <div><strong>${d.winner}</strong> wins by +${(d.accuracy_delta*100).toFixed(2)}% &mdash; ${d.recommendation||''}</div>
@@ -312,14 +378,21 @@ const MiningLab = {
                         ${makeCM('Naive Bayes Confusion Matrix', nb.confusion_matrix)}
                         ${makeCM('SVM Confusion Matrix', svm.confusion_matrix)}
                     </div>`;
+                this.setRunStatus('success', 'Success: Classification');
 
                 setTimeout(() => {
                     container.querySelectorAll('.confidence-bar-fill[data-w]').forEach(bar => {
                         requestAnimationFrame(() => { bar.style.width = bar.dataset.w + '%'; });
                     });
                 }, 80);
-            } else { container.innerHTML = `<div class="placeholder-box">${result.message}</div>`; }
-        } catch(e) { container.innerHTML = `<div class="placeholder-box">Error: ${e.message}</div>`; }
+            } else {
+                this.setRunStatus('error', 'Failed: Classification');
+                container.innerHTML = `<div class="placeholder-box">${result.message || 'Classification failed. Ensure frozen corpus is available.'}</div>`;
+            }
+        } catch(e) {
+            this.setRunStatus('error', 'Failed: Classification');
+            container.innerHTML = `<div class="placeholder-box">Error: ${e.message}</div>`;
+        }
     },
 
     // Live Predict
@@ -360,6 +433,7 @@ const MiningLab = {
     async runClustering() {
         const container = document.getElementById('clustering-results');
         const k = document.getElementById('num-clusters')?.value || 4;
+        this.setRunStatus('running', 'Running: Clustering');
         container.innerHTML = '<div class="placeholder-box">Running Bisecting K-Means + LSA...</div>';
         try {
             const r = await fetch('http://localhost:5000/api/cdm/cluster', {
@@ -383,21 +457,35 @@ const MiningLab = {
                         </div>
                     </div>`;
                 }).join('');
-                container.innerHTML = `
+                const standard = this.renderStandardSections({
+                    method: d.method,
+                    params: `n_clusters=${k}`,
+                    metrics: { silhouette: d.silhouette_score, overall_purity: (d.overall_purity * 100).toFixed(1) + '%' },
+                    interpretation: d.interpretation
+                });
+                container.innerHTML = `${standard}
                     <div class="stats-box" style="margin-bottom:16px;">
                         ${d.sampled?`<span>Sampled: ${d.sample_size} docs</span>`:''}
                         <span>Overall Purity: ${(d.overall_purity*100).toFixed(1)}%</span>
                         <span>Silhouette: ${d.silhouette_score.toFixed(3)}</span>
                     </div>
                     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">${cards}</div>`;
-            } else { container.innerHTML = `<div class="placeholder-box">${result.message}</div>`; }
-        } catch(e) { container.innerHTML = `<div class="placeholder-box">Error: ${e.message}</div>`; }
+                this.setRunStatus('success', 'Success: Clustering');
+            } else {
+                this.setRunStatus('error', 'Failed: Clustering');
+                container.innerHTML = `<div class="placeholder-box">${result.message || 'Clustering failed. Check K range and frozen data.'}</div>`;
+            }
+        } catch(e) {
+            this.setRunStatus('error', 'Failed: Clustering');
+            container.innerHTML = `<div class="placeholder-box">Error: ${e.message}</div>`;
+        }
     },
 
 
     // PCA Scatter -- 2D projection of cluster assignments (CDM plan: Scatter Plots)
     async runPCAScatter(nClusters) {
         const container = document.getElementById('clustering-results');
+        this.setRunStatus('running', 'Running: PCA');
         const existing = container.querySelector('#pca-canvas-wrap');
         if (existing) existing.remove();
 
@@ -468,14 +556,17 @@ const MiningLab = {
                         }
                     }
                 });
+                this.setRunStatus('success', 'Success: PCA');
             }
         } catch(e) {
+            this.setRunStatus('error', 'Failed: PCA');
             if (loadEl.parentNode) loadEl.remove();
         }
     },
 
     async runElbowCurve() {
         const container = document.getElementById('clustering-results');
+        this.setRunStatus('running', 'Running: Elbow');
         container.innerHTML = '<div class="placeholder-box">Computing Elbow Curve...</div>';
         try {
             const r = await fetch('http://localhost:5000/api/cdm/elbow');
@@ -496,13 +587,21 @@ const MiningLab = {
                         scales:{x:{grid:{display:false},ticks:{color:'#9CA3AF'}},
                                 y:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{color:'#9CA3AF'}}}}
                 });
-            } else { container.innerHTML = `<div class="placeholder-box">${result.message}</div>`; }
-        } catch(e) { container.innerHTML = `<div class="placeholder-box">Error: ${e.message}</div>`; }
+                this.setRunStatus('success', 'Success: Elbow');
+            } else {
+                this.setRunStatus('error', 'Failed: Elbow');
+                container.innerHTML = `<div class="placeholder-box">${result.message || 'Elbow computation failed.'}</div>`;
+            }
+        } catch(e) {
+            this.setRunStatus('error', 'Failed: Elbow');
+            container.innerHTML = `<div class="placeholder-box">Error: ${e.message}</div>`;
+        }
     },
 
     // Temporal
     async runTemporal() {
         const container = document.getElementById('temporal-results');
+        this.setRunStatus('running', 'Running: Temporal');
         container.innerHTML = '<div class="placeholder-box">Analyzing time-series trends...</div>';
         try {
             const r = await fetch('http://localhost:5000/api/cdm/temporal', {method:'POST'});
@@ -527,8 +626,13 @@ const MiningLab = {
                 }).join('');
                 const corrHtml = Object.entries(d.cross_category_correlation||{}).map(([k,v])=>
                     `<span class="rule-stat-chip">${k}: <strong>${v.toFixed(2)}</strong></span>`).join('');
-                container.innerHTML = `
-                    <p style="font-size:13px;color:var(--text-2);margin-bottom:16px;">${d.interpretation}</p>
+                const standard = this.renderStandardSections({
+                    method: d.analysis_type,
+                    params: 'default temporal analysis',
+                    metrics: { categories: Object.keys(d.category_trends || {}).length, correlations: Object.keys(d.cross_category_correlation || {}).length },
+                    interpretation: d.interpretation
+                });
+                container.innerHTML = `${standard}
                     <div style="width:100%;height:240px;margin-bottom:20px;"><canvas id="temporalChart"></canvas></div>
                     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px;">${trendHtml}</div>
                     <div>
@@ -542,13 +646,21 @@ const MiningLab = {
                         scales:{x:{grid:{display:false},ticks:{color:'#9CA3AF',font:{size:10}}},
                                 y:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{color:'#9CA3AF',font:{size:10}}}}}
                 });
-            } else { container.innerHTML = `<div class="placeholder-box">${result.message}</div>`; }
-        } catch(e) { container.innerHTML = `<div class="placeholder-box">Error: ${e.message}</div>`; }
+                this.setRunStatus('success', 'Success: Temporal');
+            } else {
+                this.setRunStatus('error', 'Failed: Temporal');
+                container.innerHTML = `<div class="placeholder-box">${result.message || 'Temporal analysis failed.'}</div>`;
+            }
+        } catch(e) {
+            this.setRunStatus('error', 'Failed: Temporal');
+            container.innerHTML = `<div class="placeholder-box">Error: ${e.message}</div>`;
+        }
     },
 
     // Keywords
     async runKeywords() {
         const container = document.getElementById('keywords-results');
+        this.setRunStatus('running', 'Running: Keywords');
         container.innerHTML = '<div class="placeholder-box">Extracting vocabulary prominence...</div>';
         try {
             const r = await fetch('http://localhost:5000/api/cdm/keywords', {
@@ -566,7 +678,13 @@ const MiningLab = {
                         </div>
                     </div>`).join('');
                 const crossHtml = (d.cross_category_terms||[]).map(t=>`<span class="keyword-tag">${t}</span>`).join('');
-                container.innerHTML = `
+                const standard = this.renderStandardSections({
+                    method: 'TF-IDF Keyword Prominence',
+                    params: 'top_n=20',
+                    metrics: { global_terms: (d.global_top_terms || []).length, cross_category_terms: (d.cross_category_terms || []).length },
+                    interpretation: d.interpretation
+                });
+                container.innerHTML = `${standard}
                     <div style="display:flex;gap:20px;margin-bottom:24px;">
                         <div style="flex:2;height:240px;"><canvas id="keywordsChart"></canvas></div>
                         <div style="flex:1;padding:16px;background:var(--bg-subtle);border-radius:var(--r-lg);border:1px solid var(--border);">
@@ -588,8 +706,15 @@ const MiningLab = {
                         scales:{x:{grid:{display:false},ticks:{color:'#9CA3AF',font:{size:10}}},
                                 y:{grid:{display:false},ticks:{color:'#5C6370',font:{size:11,weight:'600'}}}}}
                 });
-            } else { container.innerHTML = `<div class="placeholder-box">${result.message}</div>`; }
-        } catch(e) { container.innerHTML = `<div class="placeholder-box">Error: ${e.message}</div>`; }
+                this.setRunStatus('success', 'Success: Keywords');
+            } else {
+                this.setRunStatus('error', 'Failed: Keywords');
+                container.innerHTML = `<div class="placeholder-box">${result.message || 'Keyword analysis failed.'}</div>`;
+            }
+        } catch(e) {
+            this.setRunStatus('error', 'Failed: Keywords');
+            container.innerHTML = `<div class="placeholder-box">Error: ${e.message}</div>`;
+        }
     }
 };
 

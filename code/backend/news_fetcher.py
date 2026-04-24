@@ -213,7 +213,7 @@ def _background_fetch_task():
                 # For simplicity, passing the actual newly fetched list directly is safest
                 # Note: `all_articles` holds all fetched; but only `saved_count` were actually new.
                 # Just passing `all_articles` to update_index is okay if we are confident they weren't in index, but DuckDB deduplicates them during saving.
-                new_docs_from_db = database.execute_query(f"SELECT * FROM news_articles ORDER BY rowid DESC LIMIT {saved_count}")
+                new_docs_from_db = database.execute_query(f"SELECT * FROM news_articles ORDER BY doc_id DESC LIMIT {saved_count}")
                 if len(new_docs_from_db) == saved_count:
                     ir_engine.update_index(all_docs, new_docs_from_db)
                     print("[+] Search index updated incrementally")

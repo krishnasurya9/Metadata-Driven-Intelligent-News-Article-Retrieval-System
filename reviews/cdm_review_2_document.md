@@ -2,60 +2,165 @@
 **Concepts of Data Mining**
 
 ## 1. Data Analytics Design
-The Analytics Module scans the localized DuckDB news warehouse.
-- **Objective:** Discover term correlations and categorize massive streams of unstructured text.
-- **Algorithms:** KMeans (Clustering), Apriori (Association Rules for Keyword sequences), SVM (Supervised Classification on frozen targets).
+
+The CDM module performs reproducible mining on a frozen corpus and returns structured JSON to a single frontend dashboard.
+
+- **Objective:** Discover category structure, class boundaries, keyword associations, and temporal trends from unstructured news text.
+- **Fixed Data Policy:** CDM uses only `frozen_corpus.csv`; it does not use live IRT updates.
+
+### Pipeline Diagram
+```mermaid
+flowchart TD
+    frozen[CDM Frozen Corpus CSV] --> prep[Preprocessing and TF IDF]
+    prep --> cluster[Bisecting K Means and PCA]
+    prep --> classify[NaiveBayes vs LinearSVM]
+    prep --> assoc[FPGrowth Rules]
+    prep --> temporal[Temporal Pattern Mining]
+    prep --> keywords[Keyword Prominence]
+    cluster --> api[Flask CDM API]
+    classify --> api
+    assoc --> api
+    temporal --> api
+    keywords --> api
+    api --> ui[CDM Frontend]
+```
+
+### Algorithm Selection and Justification
+- **Bisecting K-Means + LSA:** stable clustering for sparse high-dimensional text vectors.
+- **Naive Bayes vs Linear SVM:** benchmark both classifiers and keep best performer.
+- **FP-Growth (not Apriori):** memory-efficient association rule mining for large text transactions.
+- **PCA/SVD projection:** converts high-dimensional features to 2D visualization space.
 
 ## 2. High-Level System Architecture Design
-The architecture follows a decoupled client-server paradigm.
-- **Client:** HTML/Vanilla JS with Chart.js.
-- **Server:** Flask REST API routing to `mining_engine.py` and `analytics_engine.py`.
-- **Data Engine:** DuckDB acting as the embedded transactional data store, interacting with `pandas` and `scikit-learn` models.
 
-## 3. Database / Warehouse Design
-- **Engine:** DuckDB (OLAP-optimized).
-- **Primary Schema `news_articles`:** 
-  - `id` (VARCHAR PK)
-  - `title` (VARCHAR)
-  - `content` (TEXT)
-  - `source` (VARCHAR)
-  - `category` (VARCHAR)
-  - `published_at` (TIMESTAMP)
-  - `url` (VARCHAR)
-- Data is bulk-imported through CSV streams and incrementally updated via live APIs.
+The system uses a decoupled client-server architecture with strict endpoint contracts.
+
+```mermaid
+graph LR
+    subgraph frontend [Frontend]
+        ui[HTML JS Controller]
+        charts[ChartJS Visual Layer]
+    end
+    subgraph backend [Flask Backend]
+        router[API Router]
+        cdm[cDM Engines]
+    end
+    subgraph dataLayer [Data Layer]
+        frozenData[(frozen_corpus.csv)]
+        modelArtifacts[(models and derived outputs)]
+    end
+
+    ui --> router
+    router --> cdm
+    cdm --> frozenData
+    cdm --> modelArtifacts
+    router --> charts
+```
+
+### API Specification (Current)
+- `GET /api/cdm/stats`
+- `POST /api/cdm/cluster`
+- `GET /api/cdm/elbow`
+- `POST /api/cdm/classify`
+- `POST /api/cdm/predict`
+- `POST /api/cdm/pca`
+- `POST /api/cdm/association`
+- `POST /api/cdm/temporal`
+- `POST /api/cdm/keywords`
+
+## 3. Database / Dataset Design
+
+- **IRT storage engine:** DuckDB for dynamic and live/updating retrieval corpus.
+- **CDM analysis dataset:** frozen CSV for repeatable mining and review consistency.
+- **Contract:** CDM endpoints are guarded to fail if frozen corpus is missing.
+
+### Conceptual Data Model (CDM)
+```mermaid
+erDiagram
+    ARTICLE {
+        INT doc_id
+        STRING title
+        STRING content
+        STRING category
+        STRING source
+        DATE published_at
+    }
+    CLUSTER_RESULT {
+        INT cluster_id
+        FLOAT purity
+        FLOAT silhouette
+    }
+    CLASSIFICATION_RESULT {
+        STRING model_name
+        FLOAT accuracy
+        STRING winner
+    }
+    ASSOCIATION_RULE {
+        STRING antecedent
+        STRING consequent
+        FLOAT support
+        FLOAT confidence
+        FLOAT lift
+    }
+    ARTICLE ||--o{ CLUSTER_RESULT : contributes
+    ARTICLE ||--o{ CLASSIFICATION_RESULT : trains
+    ARTICLE ||--o{ ASSOCIATION_RULE : derives
+```
 
 ## 4. Screen / Input / Form Design
-- **Main Interface:** A singular Dashboard (`index.html`).
-- **Input:** Global Search Bar, Date Range Filters, Parameter Sliders for Algorithm Tuning (e.g., configuring K-clusters).
-- **Forms:** Data upload forms allowing analysts to upload custom `.csv` datasets on the fly.
+
+- Main interface: `index.html` with CDM sidebar modules.
+- Each module has explicit run controls and structured outputs.
+- New review hardening additions:
+  - Status badges: `Not Run`, `Running`, `Success`, `Failed`
+  - Standard output blocks: `Method`, `Input Params`, `Key Metrics`, `Interpretation`
+  - Parameter hints for clustering and association thresholds
+  - Review Mode toggle for compact demo flow
 
 ## 5. Visualization / Graph / Chart Design
-Visualizations are generated on the frontend using Chart.js consuming stats endpoints:
-- **Bar Charts:** Displaying Category Distribution.
-- **Scatter Plots:** 2D PCA representation of K-Means clusters.
-- **Line Graphs:** Temporal trending volume of specific news tags over time.
-- **Tables:** Apriori Rules metrics (Confidence, Support, Lift).
+
+- **Clustering:** cluster cards + purity/silhouette + PCA scatter.
+- **Classification:** dual model scorecards + confusion matrices + live predict confidence.
+- **Association:** rule cards with support/confidence/lift chips.
+- **Temporal:** trend lines and cross-category correlation chips.
+- **Keywords:** global and category-defining TF-IDF term visualizations.
 
 ## 6. Test Data and Test Case Design
-### 6.1 Test Data
-- `frozen_corpus.csv` (~120k records from AG News).
-- Synthetic edge cases (null fields, malformed dates) for robust ingestion testing.
-### 6.2 Test Cases
-- **TC1:** Rebuilding Index with updated corpus size -> Expected: Index regenerates in < 15s.
-- **TC2:** Running SVM on 10k sample -> Expected: Accuracy > 85%, F1 Score calculated.
-- **TC3:** Dashboard rendering performance -> Expected: Renders 5 charts in under 2 seconds.
 
-## 7. Issues Faced & Resolutions
-During the architectural design and system implementation, several technical hurdles were encountered:
+### 6.1 Test Methodology
+- Component integration tests through real API calls.
+- Boundary testing for invalid params and empty result scenarios.
+- Frozen-dataset contract validation.
 
-1. **Massive Memory Overhead during Data Mining (K-Means/SVM):** 
-   - *Issue:* Running complex unsupervised clustering (K-Means) and Apriori on the entire 120,000-record dataset caused massive RAM consumption and timeouts.
-   - *Resolution:* Implemented dynamic bounds like `max_features` constraints in TF-IDF for the CDM pipeline to limit dimensionality, and established a "frozen_corpus" pattern to ensure reproducible, fast review metrics.
+### 6.2 Validation Snapshot
+- Automated endpoint run: `python code/backend/test_api.py`
+- Result: **12/12 tests passed**
 
-2. **Index Synchronization Rebuild Loops:**
-   - *Issue:* Whenever the backend restarted or the live-news fetcher triggered, the system rebuilt the *entire* index for all 120k articles. This caused the backend startup to halt for roughly an hour while new Vector Embeddings were mapped.
-   - *Resolution:* Developed an `update_index` incremental methodology where the backend compares the DuckDB `rowid` counts to the `index_meta.json`. It now uniquely bounds and encodes *only* freshly added articles to append to FAISS, dropping update time from 1 hour to `< 5 seconds`.
-   
-3. **Module Import Failures on Refactor:**
-   - *Issue:* Python's strict module pathing (`sys.path`) broke when separating the backend APIs from the CDM analytics and utility extraction scripts.
-   - *Resolution:* Built an absolute path resolution configuration using `os.path.abspath(__file__)` to allow terminal execution from any working directory across the project.
+| Endpoint | Payload | Expected Core Fields | Status |
+| :--- | :--- | :--- | :--- |
+| `/api/cdm/stats` | none | total_docs, vocabulary_size | Pass |
+| `/api/cdm/cluster` | `{"n_clusters":3}` | clusters, silhouette_score, overall_purity | Pass |
+| `/api/cdm/elbow` | none | k_values, inertia, recommended_k | Pass |
+| `/api/cdm/classify` | `{}` | naive_bayes, svm, winner, accuracy_delta | Pass |
+| `/api/cdm/predict` | text input | predicted_category, confidence | Pass |
+| `/api/cdm/pca` | `{"n_clusters":3,"sample_size":200}` | points, cluster_labels | Pass |
+| `/api/cdm/association` | support/confidence | rules, lift metrics | Pass |
+| `/api/cdm/temporal` | `{}` | category_trends, correlation | Pass |
+| `/api/cdm/keywords` | `{"top_n":10}` | global_top_terms, category_defining_terms | Pass |
+
+## 7. Issues Faced and Resolutions
+
+1. **High memory pressure in large text mining**
+   - Resolution: feature bounds and sampling where required.
+2. **Review reproducibility risk from live data**
+   - Resolution: strict frozen-corpus-only CDM contract.
+3. **Frontend clarity and demo reliability**
+   - Resolution: status badges, standard result layout, actionable errors, review mode.
+
+## 8. Review-2 Conclusion
+
+The CDM system design is now aligned with implementation:
+- correct algorithms (FP-Growth, Bisecting K-Means, SVM/NB benchmark),
+- correct `/api/cdm/*` endpoint contracts,
+- strict data separation from IRT live pipeline,
+- review-ready frontend behavior and verifiable endpoint evidence.

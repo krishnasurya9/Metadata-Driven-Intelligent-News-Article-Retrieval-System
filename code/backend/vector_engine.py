@@ -106,6 +106,73 @@ def build_index(documents: List[Dict]) -> Dict[str, Any]:
         "dimension": dimension
     }
 
+def update_index(new_documents: List[Dict]) -> Dict[str, Any]:
+    """
+    Incrementally update FAISS index with new documents
+    """
+    global _index, _doc_ids, _doc_map
+    
+    if not new_documents:
+        return {"status": "success", "message": "No documents to update"}
+        
+    if _index is None:
+        if not load_index():
+            return {"status": "error", "message": "Vector index not loaded or not found"}
+            
+    print(f"Updating vector index for {len(new_documents)} new documents...")
+    model = get_model()
+    
+    if model is None:
+        return {"status": "error", "message": "Embedding model not available"}
+        
+    texts = []
+    start_idx = len(_doc_ids)
+    
+    for idx, doc in enumerate(new_documents):
+        # Enriched text representation
+        title = doc.get('title', '') or ''
+        content = (doc.get('content', '') or '')[:1000] # Truncate for speed
+        category = doc.get('category', 'general')
+        source = doc.get('source', 'unknown')
+        tags = doc.get('tags', '')
+        
+        # Format: [CATEGORY] [SOURCE] [TAGS] Title. Content
+        enriched_text = f"[{category}] [{source}] "
+        if tags:
+            enriched_text += f"[{tags}] "
+        enriched_text += f"{title}. {content}"
+        
+        texts.append(enriched_text)
+        
+        doc_id = doc['doc_id']
+        _doc_ids.append(doc_id)
+        _doc_map[doc_id] = start_idx + idx
+        
+    # Encode texts
+    embeddings = model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
+    
+    # Normalize embeddings for Cosine Similarity
+    faiss.normalize_L2(embeddings)
+    
+    # Add to FAISS
+    _index.add(embeddings)
+    
+    # Save index and metadata
+    os.makedirs(os.path.dirname(INDEX_PATH), exist_ok=True)
+    faiss.write_index(_index, INDEX_PATH)
+    
+    with open(META_PATH, 'wb') as f:
+        pickle.dump({
+            'doc_ids': _doc_ids,
+            'doc_map': _doc_map
+        }, f)
+        
+    return {
+        "status": "success",
+        "documents_added": len(new_documents),
+        "total_documents": len(_doc_ids)
+    }
+
 def load_index() -> bool:
     """Load index from disk"""
     global _index, _doc_ids, _doc_map

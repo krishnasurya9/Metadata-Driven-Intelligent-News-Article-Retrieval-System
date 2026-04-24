@@ -2,6 +2,26 @@ import pandas as pd
 import os
 import re
 
+FROZEN_CORPUS_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '..', '..', 'cdm_data', 'frozen_corpus.csv')
+)
+
+def get_frozen_corpus_path() -> str:
+    """Return the canonical CDM frozen corpus path."""
+    return FROZEN_CORPUS_PATH
+
+def frozen_corpus_exists() -> bool:
+    """True when the CDM frozen corpus is available."""
+    return os.path.exists(FROZEN_CORPUS_PATH)
+
+def get_frozen_corpus_status() -> dict:
+    """Expose frozen corpus status for API guards and debugging."""
+    return {
+        "source": "cdm_frozen_corpus",
+        "path": FROZEN_CORPUS_PATH,
+        "exists": frozen_corpus_exists()
+    }
+
 def load_frozen_data() -> pd.DataFrame:
     """
     Load, clean, and return the frozen AG News dataset.
@@ -16,7 +36,7 @@ def load_frozen_data() -> pd.DataFrame:
     Returns cleaned DataFrame with columns:
     [doc_id, title, content, category, source, published_at, combined_text, text_length]
     """
-    path = os.path.join(os.path.dirname(__file__), '..', '..', 'cdm_data', 'frozen_corpus.csv')
+    path = FROZEN_CORPUS_PATH
     if not os.path.exists(path):
         return pd.DataFrame()
         

@@ -207,7 +207,14 @@
             <!-- Top Bar -->
             <div class="mining-topbar">
                 <div class="mining-breadcrumb" id="mining-active-module-name">Data Warehousing & ETL</div>
-                <div class="mining-course-tag">Computational Data Mining — Frozen AG News Corpus</div>
+                <div class="mining-topbar-right">
+                    <span id="cdm-run-status" class="cdm-status-badge idle">Not Run</span>
+                    <label class="review-mode-toggle">
+                        <input type="checkbox" id="review-mode-toggle">
+                        <span>Review Mode</span>
+                    </label>
+                    <div class="mining-course-tag">Computational Data Mining — Frozen AG News Corpus</div>
+                </div>
             </div>
 
             <!-- ── Data Warehouse & ETL ── -->
@@ -323,6 +330,7 @@
                             <label>Min Support: <input type="number" id="min-support" value="0.05" min="0.01" max="0.5" step="0.01" class="param-input"></label>
                             <label>Min Confidence: <input type="number" id="min-confidence" value="0.2" min="0.1" max="1.0" step="0.05" class="param-input"></label>
                         </div>
+                        <div class="param-hint">Lower support/confidence if rules are empty. Recommended: support 0.02-0.08, confidence 0.2-0.4.</div>
                         <button id="run-association" class="run-btn">🔍 Generate Rules</button>
                     </div>
                 </div>
@@ -340,6 +348,7 @@
                     </div>
                     <div class="panel-actions">
                         <button id="run-classification" class="run-btn">🚀 Train & Evaluate</button>
+                        <div class="param-hint">Trains on frozen corpus sample and compares Naive Bayes vs Linear SVM.</div>
                     </div>
                 </div>
                 <div id="classification-results" class="panel-results">
@@ -358,6 +367,7 @@
                         <div class="param-row">
                             <label>Clusters (K): <input type="number" id="num-clusters" value="5" min="2" max="10" class="param-input"></label>
                         </div>
+                        <div class="param-hint">Try K=4 to K=6 first. Use Elbow Curve to justify final K in review.</div>
                         <button id="run-clustering" class="run-btn">&#9654; Run K-Means</button>
                         <button id="run-pca" class="run-btn run-btn-secondary">&#128200; PCA Scatter</button>
                     </div>
@@ -441,6 +451,19 @@
     <div id="loading-overlay" class="loading-overlay hidden">
         <div class="loader"></div>
         <p>Searching...</p>
+    </div>
+
+    <!-- Article Detail Modal -->
+    <div id="article-modal" class="article-modal hidden" role="dialog" aria-modal="true" aria-labelledby="article-modal-title">
+        <div id="article-modal-overlay" class="article-modal-overlay"></div>
+        <div class="article-modal-card">
+            <button id="article-modal-close" class="article-modal-close" aria-label="Close article details">&times;</button>
+            <div class="article-modal-header">
+                <h2 id="article-modal-title">Article</h2>
+                <div id="article-modal-meta" class="article-modal-meta"></div>
+            </div>
+            <div id="article-modal-body" class="article-modal-body"></div>
+        </div>
     </div>
 
     <!-- Scripts (load order matters) -->
