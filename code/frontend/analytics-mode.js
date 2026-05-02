@@ -95,7 +95,7 @@ const Analytics = {
                         data: values,
                         backgroundColor: palette,
                         borderWidth: 2,
-                        borderColor: '#FFFFFF',
+                        borderColor: 'transparent',
                         hoverBorderWidth: 0
                     }]
                 },

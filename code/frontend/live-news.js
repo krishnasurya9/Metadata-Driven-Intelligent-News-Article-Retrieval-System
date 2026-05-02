@@ -42,7 +42,8 @@ async function fetchLiveNews() {
                             position: fixed;
                             bottom: 20px;
                             right: 20px;
-                            background: white;
+                            background: var(--bg-card);
+                            color: var(--text);
                             border-left: 4px solid #10b981;
                             padding: 16px;
                             border-radius: 8px;

@@ -3,33 +3,60 @@ import os
 import re
 
 # =========================================================
-# DATASET TOGGLE: Switch between the datasets for your review
-# Set this to "HUFFPOST" for the 42-category dataset
-# Set this to "AG_NEWS" for the original 4-category dataset
+# DATASET TOGGLE: default dataset at startup.
+# Runtime switching is exposed via backend API.
 # =========================================================
-ACTIVE_DATASET = "HUFFPOST" 
+ACTIVE_DATASET = "HUFFPOST"
 
 BASE_DIR = os.path.dirname(__file__)
 AG_NEWS_PATH = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'cdm_data', 'frozen_corpus.csv'))
 HUFFPOST_PATH = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'cdm_data', 'huffpost_corpus.json'))
 
-FROZEN_CORPUS_PATH = HUFFPOST_PATH if ACTIVE_DATASET == "HUFFPOST" else AG_NEWS_PATH
+def _resolve_frozen_corpus_path(dataset_name: str) -> str:
+    return HUFFPOST_PATH if dataset_name == "HUFFPOST" else AG_NEWS_PATH
+
+def get_available_datasets() -> dict:
+    return {
+        "AG_NEWS": {
+            "label": "AG News (4 categories)",
+            "path": AG_NEWS_PATH,
+            "exists": os.path.exists(AG_NEWS_PATH)
+        },
+        "HUFFPOST": {
+            "label": "HuffPost (42 categories)",
+            "path": HUFFPOST_PATH,
+            "exists": os.path.exists(HUFFPOST_PATH)
+        }
+    }
+
+def set_active_dataset(dataset_name: str) -> bool:
+    global ACTIVE_DATASET
+    normalized = (dataset_name or "").strip().upper()
+    if normalized not in ("AG_NEWS", "HUFFPOST"):
+        return False
+    ACTIVE_DATASET = normalized
+    return True
 
 def get_frozen_corpus_path() -> str:
     """Return the canonical CDM frozen corpus path."""
-    return FROZEN_CORPUS_PATH
+    return _resolve_frozen_corpus_path(ACTIVE_DATASET)
 
 def frozen_corpus_exists() -> bool:
     """True when the CDM frozen corpus is available."""
-    return os.path.exists(FROZEN_CORPUS_PATH)
+    return os.path.exists(get_frozen_corpus_path())
 
 def get_frozen_corpus_status() -> dict:
     """Expose frozen corpus status for API guards and debugging."""
     return {
         "source": "cdm_frozen_corpus",
-        "path": FROZEN_CORPUS_PATH,
-        "exists": frozen_corpus_exists()
+        "dataset": ACTIVE_DATASET,
+        "path": get_frozen_corpus_path(),
+        "exists": frozen_corpus_exists(),
+        "available_datasets": get_available_datasets()
     }
+
+_cached_df = None
+_cached_dataset_name = None
 
 def load_frozen_data() -> pd.DataFrame:
     """
@@ -45,7 +72,12 @@ def load_frozen_data() -> pd.DataFrame:
     Returns cleaned DataFrame with columns:
     [doc_id, title, content, category, source, published_at, combined_text, text_length]
     """
-    path = FROZEN_CORPUS_PATH
+    global _cached_df, _cached_dataset_name
+    
+    if _cached_df is not None and _cached_dataset_name == ACTIVE_DATASET:
+        return _cached_df.copy()
+
+    path = get_frozen_corpus_path()
     if not os.path.exists(path):
         return pd.DataFrame()
         
@@ -107,7 +139,9 @@ def load_frozen_data() -> pd.DataFrame:
         # HuffPost has 42 categories, we will use them as is.
         df['category'] = df['category'].fillna('Unknown')
     
-    return df[['doc_id', 'title', 'content', 'category', 'source', 'published_at', 'combined_text', 'text_length']]
+    _cached_df = df[['doc_id', 'title', 'content', 'category', 'source', 'published_at', 'combined_text', 'text_length']]
+    _cached_dataset_name = ACTIVE_DATASET
+    return _cached_df.copy()
 
 def get_preprocessing_stats(df) -> dict:
     """

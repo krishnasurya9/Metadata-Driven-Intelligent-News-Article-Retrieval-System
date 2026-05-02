@@ -11,7 +11,7 @@ import sys
 import traceback
 from functools import wraps
 
-# Add the parent code directory to Python path
+# Add the parent code directory to Python path  
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import database
@@ -359,6 +359,46 @@ def llm_status():
 # ==========================================
 # CDM ROUTES (FROZEN CORPUS ONLY)
 # ==========================================
+@app.route('/api/cdm/datasets', methods=['GET'])
+def cdm_datasets():
+    try:
+        status = cdm_prep.get_frozen_corpus_status()
+        return jsonify({
+            "status": "success",
+            "data": {
+                "active_dataset": status.get("dataset"),
+                "available_datasets": status.get("available_datasets", {}),
+                "active_path": status.get("path"),
+                "active_exists": status.get("exists", False)
+            }
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/cdm/datasets', methods=['POST'])
+def cdm_set_dataset():
+    try:
+        data = request.json or {}
+        dataset = (data.get('dataset') or '').strip().upper()
+        if not cdm_prep.set_active_dataset(dataset):
+            return jsonify({
+                "status": "error",
+                "message": "Invalid dataset. Use AG_NEWS or HUFFPOST."
+            }), 400
+
+        status = cdm_prep.get_frozen_corpus_status()
+        if not status.get("exists"):
+            return jsonify({
+                "status": "error",
+                "message": f"Selected dataset file not found: {status.get('path')}",
+                "data": status
+            }), 404
+
+        print(f"[CDM] Active dataset switched -> {status.get('dataset')} @ {status.get('path')}")
+        return jsonify({"status": "success", "data": status})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/cdm/stats', methods=['GET'])
 def cdm_stats():
     try:

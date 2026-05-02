@@ -40,21 +40,24 @@ def log_index_update(message: str):
         print(f"Logging failed: {e}")
 
 def check_index_exists() -> bool:
-    """Check if ALL indices exist"""
+    """Check if ALL indices and their metadata exist"""
     bm25_exists = os.path.exists(INDEX_PATH) and os.path.getsize(INDEX_PATH) > 0
-    vector_exists = os.path.exists(vector_engine.INDEX_PATH)
+    vector_exists = os.path.exists(vector_engine.INDEX_PATH) and os.path.getsize(vector_engine.INDEX_PATH) > 0
+    bm25_meta_exists = os.path.exists(INDEX_META_PATH) and os.path.getsize(INDEX_META_PATH) > 0
+    vector_meta_exists = os.path.exists(vector_engine.META_PATH) and os.path.getsize(vector_engine.META_PATH) > 0
     
-    return bm25_exists and vector_exists
+    return bm25_exists and vector_exists and bm25_meta_exists and vector_meta_exists
 
 def check_and_build_index():
     """
     Checks if the index needs to be built and builds it if necessary.
     Otherwise, loads the existing index. Handles incremental catching up silently.
     """
-    documents = database.get_all_articles()
+    current_count = database.get_corpus_stats().get('total_documents', 0)
     
     if not check_index_exists():
         print("Index is outdated or does not exist. Building new index...")
+        documents = database.get_all_articles()
         build_index(documents)
         return
         
@@ -63,7 +66,6 @@ def check_and_build_index():
             with open(INDEX_META_PATH, 'r') as f:
                 meta = json.load(f)
             indexed_count = meta.get('doc_count', 0)
-            current_count = len(documents)
             
             if 0 < indexed_count < current_count:
                 print(f"Index mismatch: DB ({current_count}) > Index ({indexed_count}). Doing FAST INCREMENTAL update at startup.")
@@ -71,19 +73,21 @@ def check_and_build_index():
                     diff = current_count - indexed_count
                     new_docs = database.execute_query(f"SELECT * FROM news_articles ORDER BY doc_id DESC LIMIT {diff}")
                     new_docs = new_docs[::-1] # Reverse to correct chronological order
+                    documents = database.get_all_articles()
                     update_index(documents, new_docs)
                     return
         except Exception as e:
             pass
 
-    if _index_needs_update(documents):
+    if _index_needs_update(current_count):
         print("Index is outdated or does not exist. Building new index...")
+        documents = database.get_all_articles()
         build_index(documents)
     else:
         print("Index is up to date. Loading from disk...")
         load_index()
 
-def _index_needs_update(documents: List[Dict]) -> bool:
+def _index_needs_update(current_count: int) -> bool:
     """
     Internal helper to check if the index needs to be rebuilt entirely.
     """
@@ -95,7 +99,6 @@ def _index_needs_update(documents: List[Dict]) -> bool:
             meta = json.load(f)
             
         indexed_count = meta.get('doc_count', 0)
-        current_count = len(documents)
         
         # If DB is completely out of sync (e.g. wiped or different than index)
         if indexed_count != current_count:

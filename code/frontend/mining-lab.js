@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Mining Lab - CDM Enhanced
  * Visual rule cards, confidence meters, live predict, no-gridline charts
  */
@@ -127,7 +127,57 @@ const MiningLab = {
         document.getElementById('review-mode-toggle')?.addEventListener('change', (e) => {
             document.querySelector('.mining-view')?.classList.toggle('review-mode', !!e.target.checked);
         });
+        this.initDatasetSelector();
         this.initWarehouse();
+    },
+
+    async initDatasetSelector() {
+        const selectEl = document.getElementById('cdm-dataset-select');
+        if (!selectEl) return;
+
+        try {
+            const r = await fetch('http://localhost:5000/api/cdm/datasets');
+            const result = await r.json();
+            if (result.status === 'success') {
+                const active = result?.data?.active_dataset;
+                if (active) {
+                    selectEl.value = active;
+                    const label = active === 'HUFFPOST' ? 'HuffPost Corpus' : 'AG News Corpus';
+                    const brandSub = document.querySelector('.mining-brand-sub');
+                    const courseTag = document.querySelector('.mining-course-tag');
+                    if (brandSub) brandSub.textContent = `CDM — ${label}`;
+                    if (courseTag) courseTag.textContent = `Computational Data Mining — Frozen ${label}`;
+                }
+            }
+        } catch (_) {
+            // Keep default selector value when backend is unavailable.
+        }
+
+        selectEl.addEventListener('change', async (e) => {
+            const dataset = e.target.value;
+            this.setRunStatus('running', 'Switching Dataset');
+            try {
+                const r = await fetch('http://localhost:5000/api/cdm/datasets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dataset })
+                });
+                const result = await r.json();
+                if (result.status === 'success') {
+                    this.setRunStatus('success', `Dataset: ${dataset}`);
+                    this.loadWarehouseStats();
+                    const label = dataset === 'HUFFPOST' ? 'HuffPost Corpus' : 'AG News Corpus';
+                    const brandSub = document.querySelector('.mining-brand-sub');
+                    const courseTag = document.querySelector('.mining-course-tag');
+                    if (brandSub) brandSub.textContent = `CDM — ${label}`;
+                    if (courseTag) courseTag.textContent = `Computational Data Mining — Frozen ${label}`;
+                } else {
+                    this.setRunStatus('error', 'Dataset Switch Failed');
+                }
+            } catch (_) {
+                this.setRunStatus('error', 'Dataset Switch Failed');
+            }
+        });
     },
 
     setRunStatus(state, text) {
@@ -182,10 +232,10 @@ const MiningLab = {
         const el = document.getElementById('local-data-info');
         if (!el) return;
         try {
-            const r = await fetch('http://localhost:5000/api/data/info');
-            const d = await r.json();
-            const count = d?.data?.storage?.total_articles ?? '?';
-            el.innerHTML = `<span style="font-weight:700;color:var(--accent)">${Number(count).toLocaleString()}</span> articles loaded`;
+            const r = await fetch('http://localhost:5000/api/cdm/stats');
+            const res = await r.json();
+            const count = res?.data?.total_docs || res?.data?.docs_after_cleaning;
+            el.innerHTML = `<span style="font-weight:700;color:var(--accent)">${count ? Number(count).toLocaleString() : '?'}</span> articles loaded`;
         } catch { el.innerHTML = 'Backend unreachable'; }
     },
 
@@ -194,13 +244,21 @@ const MiningLab = {
         if (!el) return;
         el.innerHTML = '<div class="placeholder-box">Loading...</div>';
         try {
-            const r = await fetch('http://localhost:5000/api/stats');
-            const s = (await r.json())?.data ?? {};
+            const r = await fetch('http://localhost:5000/api/cdm/stats');
+            const res = await r.json();
+            const s = res?.data ?? {};
+            const totalDocs = s.total_docs || s.docs_after_cleaning || 0;
+            const totalCats = Object.keys(s.category_distribution || {}).length;
+            const totalSources = Object.keys(s.source_distribution || {}).length;
             el.innerHTML = `<div class="warehouse-grid">
-                <div class="warehouse-stat-card"><span class="warehouse-stat-value">${(s.total_articles||0).toLocaleString()}</span><span class="warehouse-stat-label">Articles</span></div>
-                <div class="warehouse-stat-card"><span class="warehouse-stat-value">${s.categories||0}</span><span class="warehouse-stat-label">Categories</span></div>
-                <div class="warehouse-stat-card"><span class="warehouse-stat-value">${s.sources||0}</span><span class="warehouse-stat-label">Sources</span></div>
+                <div class="warehouse-stat-card"><span class="warehouse-stat-value">${totalDocs.toLocaleString()}</span><span class="warehouse-stat-label">Articles</span></div>
+                <div class="warehouse-stat-card"><span class="warehouse-stat-value">${totalCats}</span><span class="warehouse-stat-label">Categories</span></div>
+                <div class="warehouse-stat-card"><span class="warehouse-stat-value">${totalSources}</span><span class="warehouse-stat-label">Sources</span></div>
             </div>`;
+            const infoEl = document.getElementById('local-data-info');
+            if (infoEl) {
+                infoEl.innerHTML = `<span style="font-weight:700;color:var(--accent)">${totalDocs.toLocaleString()}</span> articles loaded`;
+            }
         } catch(e) { el.innerHTML = `<div class="placeholder-box">Error: ${e.message}</div>`; }
     },
 

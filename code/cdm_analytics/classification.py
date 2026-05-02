@@ -11,8 +11,10 @@ from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.preprocessing import LabelEncoder
 
 try:
+    from . import preprocessing
     from .preprocessing import load_frozen_data
 except ImportError:
+    import preprocessing
     from preprocessing import load_frozen_data
 
 MODELS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'models')
@@ -75,9 +77,10 @@ def run_classification() -> dict:
     svm_cm = confusion_matrix(y_test, svm_pred).tolist()
     
     # Save SVM model
-    joblib.dump(svm, os.path.join(MODELS_DIR, 'cdm_svm.pkl'))
-    joblib.dump(vectorizer, os.path.join(MODELS_DIR, 'cdm_tfidf.pkl'))
-    joblib.dump(le, os.path.join(MODELS_DIR, 'cdm_le.pkl'))
+    ds = preprocessing.ACTIVE_DATASET
+    joblib.dump(svm, os.path.join(MODELS_DIR, f'cdm_svm_{ds}.pkl'))
+    joblib.dump(vectorizer, os.path.join(MODELS_DIR, f'cdm_tfidf_{ds}.pkl'))
+    joblib.dump(le, os.path.join(MODELS_DIR, f'cdm_le_{ds}.pkl'))
     
     winner = "SVM" if svm_acc >= nb_acc else "Naive Bayes"
     delta = abs(svm_acc - nb_acc)
@@ -109,9 +112,10 @@ def run_classification() -> dict:
 
 def predict_single(text: str) -> dict:
     """Predict category for a single article text."""
-    clf_path = os.path.join(MODELS_DIR, 'cdm_svm.pkl')
-    vec_path = os.path.join(MODELS_DIR, 'cdm_tfidf.pkl')
-    le_path = os.path.join(MODELS_DIR, 'cdm_le.pkl')
+    ds = preprocessing.ACTIVE_DATASET
+    clf_path = os.path.join(MODELS_DIR, f'cdm_svm_{ds}.pkl')
+    vec_path = os.path.join(MODELS_DIR, f'cdm_tfidf_{ds}.pkl')
+    le_path = os.path.join(MODELS_DIR, f'cdm_le_{ds}.pkl')
     
     if not (os.path.exists(clf_path) and os.path.exists(vec_path) and os.path.exists(le_path)):
         # Run classification to generate models on 5k sample first
