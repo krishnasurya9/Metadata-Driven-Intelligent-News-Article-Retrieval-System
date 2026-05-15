@@ -52,40 +52,51 @@ def check_and_build_index():
     """
     Checks if the index needs to be built and builds it if necessary.
     Otherwise, loads the existing index. Handles incremental catching up silently.
+
+    Decision flow:
+      1. All 4 artifact files missing → full build.
+      2. All 4 exist AND DB has MORE docs than meta → incremental update.
+      3. All 4 exist AND counts match (or DB <= indexed) → just load from disk.
+      4. If anything above errors → fall back to full build.
     """
     current_count = database.get_corpus_stats().get('total_documents', 0)
-    
+
+    # Step 1: If any index file is missing, we must build from scratch.
     if not check_index_exists():
-        print("Index is outdated or does not exist. Building new index...")
+        print("[IR] Index artifacts missing. Building full index from scratch...")
         documents = database.get_all_articles()
         build_index(documents)
         return
-        
-    if os.path.exists(INDEX_META_PATH):
-        try:
-            with open(INDEX_META_PATH, 'r') as f:
-                meta = json.load(f)
-            indexed_count = meta.get('doc_count', 0)
-            
-            if 0 < indexed_count < current_count:
-                print(f"Index mismatch: DB ({current_count}) > Index ({indexed_count}). Doing FAST INCREMENTAL update at startup.")
-                if load_index():
-                    diff = current_count - indexed_count
-                    new_docs = database.execute_query(f"SELECT * FROM news_articles ORDER BY doc_id DESC LIMIT {diff}")
-                    new_docs = new_docs[::-1] # Reverse to correct chronological order
-                    documents = database.get_all_articles()
-                    update_index(documents, new_docs)
-                    return
-        except Exception as e:
-            pass
 
-    if _index_needs_update(current_count):
-        print("Index is outdated or does not exist. Building new index...")
-        documents = database.get_all_articles()
-        build_index(documents)
-    else:
-        print("Index is up to date. Loading from disk...")
-        load_index()
+    # Step 2 & 3: All files exist — read meta and decide load vs incremental.
+    try:
+        with open(INDEX_META_PATH, 'r') as f:
+            meta = json.load(f)
+        indexed_count = meta.get('doc_count', 0)
+
+        if indexed_count > 0 and current_count > indexed_count:
+            # DB has grown since last index → incremental update
+            diff = current_count - indexed_count
+            print(f"[IR] DB has {diff} new docs since last index. Running incremental update...")
+            if load_index():
+                new_docs = database.execute_query(
+                    f"SELECT * FROM news_articles ORDER BY doc_id DESC LIMIT {diff}"
+                )
+                new_docs = new_docs[::-1]  # chronological order
+                update_index(database.get_all_articles(), new_docs)
+            else:
+                # load failed unexpectedly, rebuild
+                print("[IR] Load failed during incremental path. Rebuilding...")
+                build_index(database.get_all_articles())
+        else:
+            # Index is current (or DB has same/fewer docs) → just load
+            print(f"[IR] Index is up to date ({indexed_count} docs). Loading from disk...")
+            load_index()
+
+    except Exception as e:
+        # Meta read failed for any reason → safe fallback: full rebuild
+        print(f"[IR] Could not read index metadata ({e}). Rebuilding full index...")
+        build_index(database.get_all_articles())
 
 def _index_needs_update(current_count: int) -> bool:
     """
@@ -193,7 +204,7 @@ def update_index(all_documents: List[Dict], new_documents: List[Dict]) -> Dict[s
     # 2. Rebuild BM25 for all ONLY if adding a massive batch (> 500)
     # Rebuilding BM25 for 120k docs takes ~48 seconds. For live news batches (~200), we skip it!
     # FAISS semantic vector search is 100% updated immediately and will perfectly retrieve these docs.
-    if len(new_documents) > 500:
+    if len(new_documents) > 5000:
         print(f"Rebuilding complete BM25 index for {len(all_documents)} documents...")
         tokenized_corpus = []
         _doc_ids = []

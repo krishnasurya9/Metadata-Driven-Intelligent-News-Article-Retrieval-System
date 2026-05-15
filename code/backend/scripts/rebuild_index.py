@@ -15,7 +15,7 @@ if __name__ == '__main__':
     database.init_database()
     
     stats = database.get_corpus_stats()
-    total = stats.get('total_articles', 0)
+    total = stats.get('total_documents', 0)
     if total == 0:
         print("Database is empty. Nothing to index.")
         sys.exit(0)
